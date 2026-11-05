@@ -1315,6 +1315,21 @@ window.__ModuleLoader__.load({
         || entities.find(e => e.id === selectedId && e.type === typeDef.type)
         || null;
 
+      /** 全库搜索：跨类型匹配标题/标签/字段，命中处标注（标题/标签/字段名）。 */
+      const globalHits = !kw ? [] : entities.flatMap(e => {
+        const hits = [];
+        if (e.title.includes(kw)) hits.push(t('search.inTitle'));
+        if (e.tags.some(tag => tag.includes(kw))) hits.push(t('search.inTags'));
+        for (const [key, value] of Object.entries(e.properties)) {
+          if (typeof value === 'string' && value.includes(kw)) {
+            const field = ENTITY_TYPES.find(x => x.type === e.type)?.fields.find(f => f.key === key);
+            hits.push((field?.label || key) + ': ' + value.slice(0, 20));
+            break;
+          }
+        }
+        return hits.length ? [{ entity: e, where: hits[0] }] : [];
+      });
+
       /** 页签按钮公共样式。 */
       const pill = (active) => ({
         padding: '5px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 13,
@@ -1352,6 +1367,31 @@ window.__ModuleLoader__.load({
           h('button', { onClick: () => actions.setView('timeline'), style: pill(view === 'timeline') }, t('tab.timeline')),
           h('button', { onClick: () => actions.setView('portal'), style: pill(view === 'portal') }, t('tab.portal')),
         ),
+
+        // 全库搜索：跨类型；有关键词且不在详情态时，在列表上方出全库命中区。
+        view === 'workbench' && kw && !selected
+          ? h('div', { style: { marginBottom: 14 } },
+            h(Card, { pad: 12 },
+              h('div', { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } },
+                t('search.globalTitle') + ' · ' + globalHits.length),
+              globalHits.length === 0
+                ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('search.noHits'))
+                : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+                  globalHits.slice(0, 12).map(({ entity: e, where }) => h('div', {
+                    key: e.id,
+                    onClick: () => { actions.selectType(e.type); actions.selectEntity(e.id); },
+                    style: {
+                      display: 'flex', gap: 8, alignItems: 'center', padding: '4px 8px',
+                      borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                      background: 'var(--dsw-alias-bg-layer-2)',
+                    },
+                  },
+                    h(TypeGlyph, { glyph: ENTITY_TYPES.find(x => x.type === e.type)?.glyph, size: 12 }),
+                    h('span', { style: { fontWeight: 600 } }, e.title),
+                    h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
+                      (ENTITY_TYPES.find(x => x.type === e.type)?.label || e.type) + ' · ' + where),
+                  )))))
+          : null,
 
         view === 'portal'
           ? h(PortalSection, { t, useStore, actions })
@@ -1492,6 +1532,10 @@ window.__ModuleLoader__.load({
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
       'graph.filter': '只看关系',
       'graph.allRelations': '全部关系',
+      'search.globalTitle': '全库搜索',
+      'search.noHits': '全库无命中。',
+      'search.inTitle': '标题',
+      'search.inTags': '标签',
       'timeline.title': '时间线',
       'timeline.empty': '时间线为空：给实体（主要是「事件」）的「日期/纪年」字段填上日期后自动上图。',
       'timeline.undated': '未定日期',
@@ -1552,6 +1596,10 @@ window.__ModuleLoader__.load({
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
       'graph.filter': 'Show relation',
       'graph.allRelations': 'All relations',
+      'search.globalTitle': 'Global search',
+      'search.noHits': 'No hits across the library.',
+      'search.inTitle': 'title',
+      'search.inTags': 'tags',
       'timeline.title': 'Timeline',
       'timeline.empty': 'Timeline is empty: fill in the "Date" field of entities (mainly "Event") and they appear here.',
       'timeline.undated': 'Undated',
