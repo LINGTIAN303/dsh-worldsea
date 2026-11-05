@@ -890,6 +890,87 @@ window.__ModuleLoader__.load({
     // 工作台视图
     // ─────────────────────────────────────────────
 
+    /**
+     * 时间线视图：把带日期的实体（event 为主，其他类型填了 date 字段的也收）按时间排序，
+     * 水平条带铺排；跨段实体（有 dateEnd）画区间条，点条带进详情。
+     * 日期是自由文本（对齐 WorldSea 历法内核外置的语义），可解析为数值的用于标尺刻度，
+     * 不可解析的按字典序排在末尾的「未定纪年」区。
+     */
+    function TimelineView(props) {
+      const { entities, actions, t } = props;
+      const dated = entities
+        .filter(e => e.properties && typeof e.properties.date === 'string' && e.properties.date.trim())
+        .map(e => ({ entity: e, date: e.properties.date.trim(), dateEnd: (e.properties.dateEnd || '').trim() }))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.entity.title.localeCompare(b.entity.title));
+      const undated = entities.filter(e => !dated.some(d => d.entity.id === e.id));
+
+      if (dated.length === 0) {
+        return h(Card, { pad: 28 },
+          h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('timeline.empty')));
+      }
+
+      return h('div', null,
+        h(Card, { pad: 14 },
+          h('div', { style: { fontSize: 14, fontWeight: 600, marginBottom: 10 } }, t('timeline.title') + ' · ' + dated.length),
+          h('div', { style: { position: 'relative', paddingLeft: 18 } },
+            // 纵向主轴。
+            h('div', {
+              style: {
+                position: 'absolute', left: 5, top: 4, bottom: 4, width: 2,
+                background: 'var(--dsw-alias-border-l2)', borderRadius: 2,
+              },
+            }),
+            dated.map(({ entity, date, dateEnd }) => h('div', { key: entity.id, style: { position: 'relative', marginBottom: 10 } },
+              // 轴点。
+              h('div', {
+                style: {
+                  position: 'absolute', left: -18, top: 5, width: 10, height: 10,
+                  borderRadius: 99, background: 'var(--dsw-alias-brand-primary)',
+                  boxShadow: '0 0 0 3px var(--dsw-alias-bg-base)',
+                },
+              }),
+              h('div', {
+                onClick: () => { actions.selectEntity(entity.id); actions.setView('workbench'); },
+                style: {
+                  display: 'inline-block', padding: '5px 12px', borderRadius: 8, cursor: 'pointer',
+                  background: 'var(--dsw-alias-bg-layer-1)', border: '1px solid var(--dsw-alias-border-l1)',
+                },
+              },
+                h('div', { style: { display: 'flex', gap: 8, alignItems: 'baseline' } },
+                  h('span', {
+                    style: {
+                      fontSize: 12, fontFamily: 'ui-monospace, monospace',
+                      color: 'var(--dsw-alias-brand-primary)', fontWeight: 600,
+                    },
+                  }, date + (dateEnd ? ' → ' + dateEnd : '')),
+                  h('span', { style: { fontSize: 14, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' } }, entity.title),
+                  h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
+                    ENTITY_TYPES.find(x => x.type === entity.type)?.label || entity.type),
+                ),
+                entity.description
+                  ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginTop: 2 } },
+                    entity.description.slice(0, 80) + (entity.description.length > 80 ? '…' : ''))
+                  : null,
+              ),
+            ))),
+        ),
+        undated.length ? h('div', { style: { marginTop: 12 } },
+          h(Card, { pad: 14 },
+            h('div', { style: { fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--dsw-alias-label-secondary)' } },
+              t('timeline.undated') + ' · ' + undated.length),
+            h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+              undated.slice(0, 30).map(e => h('span', {
+                key: e.id,
+                onClick: () => { actions.selectEntity(e.id); actions.setView('workbench'); },
+                style: {
+                  padding: '3px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
+                  background: 'var(--dsw-alias-bg-layer-1)', border: '1px solid var(--dsw-alias-border-l1)',
+                  color: 'var(--dsw-alias-label-secondary)',
+                },
+              }, e.title))))) : null,
+      );
+    }
+
     /** schema 字段渲染：view 模式或 edit 模式。 */
     function FieldRow(props) {
       const { field, value, editing, onChange } = props;
@@ -1132,6 +1213,7 @@ window.__ModuleLoader__.load({
         h('div', { style: { display: 'flex', gap: 8, marginBottom: 16 } },
           h('button', { onClick: () => actions.setView('workbench'), style: pill(view === 'workbench') }, t('tab.workbench')),
           h('button', { onClick: () => actions.setView('graph'), style: pill(view === 'graph') }, t('tab.graph')),
+          h('button', { onClick: () => actions.setView('timeline'), style: pill(view === 'timeline') }, t('tab.timeline')),
           h('button', { onClick: () => actions.setView('portal'), style: pill(view === 'portal') }, t('tab.portal')),
         ),
 
@@ -1139,7 +1221,9 @@ window.__ModuleLoader__.load({
           ? h(PortalSection, { t, useStore, actions })
           : view === 'graph'
             ? h(GraphView, { entities, relations, actions, t })
-            : h('div', null,
+            : view === 'timeline'
+              ? h(TimelineView, { entities, actions, t })
+              : h('div', null,
             // 域页签（第一级）
             h('div', { style: { display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' } },
               DOMAINS.map(d => {
@@ -1266,8 +1350,12 @@ window.__ModuleLoader__.load({
       'intro': 'WorldSea 是一个本地优先的世界观创作平台。本工作台把 WorldSea 的创作能力带入 DSH：schema 驱动的实体管理（角色 / 区域 / 道具 / 魔法），数据本地持久化。',
       'tab.workbench': '工作台',
       'tab.graph': '图谱',
+      'tab.timeline': '时间线',
       'tab.portal': '门户',
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
+      'timeline.title': '时间线',
+      'timeline.empty': '时间线为空：给实体（主要是「事件」）的「日期/纪年」字段填上日期后自动上图。',
+      'timeline.undated': '未定日期',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -1315,8 +1403,12 @@ window.__ModuleLoader__.load({
       'intro': 'WorldSea is a local-first worldbuilding platform. This workbench brings its creative capabilities into DSH: schema-driven entity management (characters / regions / items / magic), persisted locally.',
       'tab.workbench': 'Workbench',
       'tab.graph': 'Graph',
+      'tab.timeline': 'Timeline',
       'tab.portal': 'Portal',
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
+      'timeline.title': 'Timeline',
+      'timeline.empty': 'Timeline is empty: fill in the "Date" field of entities (mainly "Event") and they appear here.',
+      'timeline.undated': 'Undated',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
