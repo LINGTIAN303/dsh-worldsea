@@ -95,7 +95,7 @@ window.__ModuleLoader__.load({
         },
       },
       h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
-        h('img', { src: props.iconUrl, width: 40, height: 40, alt: '' }),
+        WorldIcon({ size: 40 }),
         h('div', null,
           h('div', { style: { fontSize: 18, fontWeight: 600 } }, 'WorldSea'),
           h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('tagline')),
@@ -141,14 +141,13 @@ window.__ModuleLoader__.load({
       );
     }
 
-    // —— 模块注入面：slots + locale ——
-    const inject = ['slots', 'locale'];
+    // —— 模块注入面：slots + locale + 右栏 tab 注册表（由 dsh.client.inject 声明的 ui-sidebar-right 包提供）——
+    const inject = ['slots', 'locale', 'sidebarRightTabs'];
 
     function apply(ctx) {
       // locale 字典注册（zh / en），卸载随 ctx.effect 清理。
       ctx.effect(() => ctx.locale.register(NS, dictionaries), NS + ': dictionaries');
       const t = ctx.locale.bind(NS);
-      const iconUrl = require.asset('plugins/dsh-worldsea/assets/icon.svg');
 
       // ① 左栏入口：sidebar.panellist 图标 + main 面板体（同 id 寻址）。
       ctx.effect(() => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
@@ -158,7 +157,7 @@ window.__ModuleLoader__.load({
 
       ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
         name: 'main', key: PANEL_ID, locale: NS,
-        inject: () => ({ t, iconUrl }),
+        inject: () => ({ t }),
       }, PortalBody)), NS + ': main');
 
       // ② 右栏入口：tab 类型注册（带 guide 引导入口卡）+ body/title 注册到 keyed 座位。
@@ -178,7 +177,7 @@ window.__ModuleLoader__.load({
 
       ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
         name: 'sidebar.right.pane.tab', key: TAB_ID, locale: NS,
-        inject: () => ({ t, iconUrl }),
+        inject: () => ({ t }),
       }, PortalBody)), NS + ': tab body');
 
       ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
