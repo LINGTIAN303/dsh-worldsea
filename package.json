@@ -1,0 +1,32 @@
+{
+  "name": "dsh-worldsea",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WorldSea 门户插件：DSH 侧栏/右栏入口，概览 WorldSea 创作平台并提供快捷链接与桌面应用唤起",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  }
+}

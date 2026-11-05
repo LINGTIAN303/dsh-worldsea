@@ -1,0 +1,4 @@
+# Bundle patch for dsh-worldsea：把门户插件行插入 profile 花名册。
+- insert:
+    - id: worldsea-portal
+      name: 'dsh-worldsea'
