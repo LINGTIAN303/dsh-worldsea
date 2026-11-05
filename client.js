@@ -276,6 +276,53 @@ window.__ModuleLoader__.load({
           if (rel.pairId) doomed.add(rel.pairId);
           draft.relations = draft.relations.filter(r => !doomed.has(r.id));
         },
+        /** 导入合并：同 id 覆盖，新 id 追加；关系按同规则并入。 */
+        importData(draft, entities, relations) {
+          const byId = new Map(draft.entities.map(e => [e.id, e]));
+          for (const incoming of entities) {
+            if (!incoming || typeof incoming.id !== 'string') continue;
+            const existing = byId.get(incoming.id);
+            if (existing) {
+              Object.assign(existing, incoming, { updatedAt: new Date().toISOString() });
+            } else {
+              const merged = {
+                id: incoming.id, type: incoming.type || 'character',
+                title: incoming.title || '未命名', description: incoming.description || '',
+                properties: incoming.properties || {}, tags: Array.isArray(incoming.tags) ? incoming.tags : [],
+                createdAt: incoming.createdAt || new Date().toISOString(),
+                updatedAt: incoming.updatedAt || new Date().toISOString(),
+              };
+              draft.entities.push(merged);
+              byId.set(merged.id, merged);
+            }
+          }
+          const knownIds = new Set(draft.entities.map(e => e.id));
+          const relById = new Map(draft.relations.map(r => [r.id, r]));
+          for (const incoming of relations) {
+            if (!incoming || typeof incoming.id !== 'string') continue;
+            if (!knownIds.has(incoming.sourceId) || !knownIds.has(incoming.targetId)) continue;
+            const existing = relById.get(incoming.id);
+            if (existing) Object.assign(existing, incoming, { updatedAt: new Date().toISOString() });
+            else {
+              const merged = {
+                id: incoming.id, type: incoming.type, sourceId: incoming.sourceId, targetId: incoming.targetId,
+                properties: incoming.properties || {}, pairId: incoming.pairId,
+                createdAt: incoming.createdAt || new Date().toISOString(),
+                updatedAt: incoming.updatedAt || new Date().toISOString(),
+              };
+              draft.relations.push(merged);
+              relById.set(merged.id, merged);
+            }
+          }
+        },
+        /** 清空全部创作数据（实体 + 关系）。 */
+        clearAll(draft) {
+          draft.entities = [];
+          draft.relations = [];
+          draft.selectedId = null;
+          draft.editing = false;
+          draft.draft = null;
+        },
       },
     });
 
@@ -484,6 +531,193 @@ window.__ModuleLoader__.load({
     }
 
     // ─────────────────────────────────────────────
+    // 关系图谱（canvas 力导向布局，零依赖）
+    // ─────────────────────────────────────────────
+
+    /**
+     * 关系图谱视图：实体为节点、关系为有向边。
+     * 布局 = 每帧弹簧-斥力迭代（Fruchterman-Reingold 简化版），
+     * 节点按类型着色，边带箭头；节点可拖拽，点选后左侧详情联动。
+     */
+    function GraphView(props) {
+      const { entities, relations, actions, t } = props;
+      const canvasRef = React.useRef(null);
+      const simRef = React.useRef(null);
+      const dragRef = React.useRef(null);
+      const [hoverId, setHoverId] = React.useState(null);
+
+      /** 类型 → 颜色（避开主题 token 无法用于 canvas 的限制，用固定语义色）。 */
+      const TYPE_COLORS = {
+        character: '#4f8ef7', region: '#4caf7d', item: '#e6a23c',
+        magic: '#9a6dd7', organization: '#e67e8b', species: '#3fb8af',
+      };
+      const colorOf = e => TYPE_COLORS[e.type] || '#8a8f9d';
+
+      React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const parent = canvas.parentElement;
+        const width = Math.max(320, parent.clientWidth - 32);
+        const height = 420;
+        canvas.width = width * 2; canvas.height = height * 2;
+        canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
+        const ctx = canvas.getContext('2d');
+        ctx.scale(2, 2);
+
+        // 初始化模拟：节点圆布局起步。
+        const nodes = entities.map((e, i) => {
+          const angle = (2 * Math.PI * i) / Math.max(1, entities.length);
+          return {
+            id: e.id, title: e.title, type: e.type,
+            x: width / 2 + Math.cos(angle) * Math.min(width, height) * 0.3,
+            y: height / 2 + Math.sin(angle) * Math.min(width, height) * 0.3,
+            vx: 0, vy: 0,
+          };
+        });
+        const byId = new Map(nodes.map(n => [n.id, n]));
+        const edges = relations
+          .filter(r => byId.has(r.sourceId) && byId.has(r.targetId))
+          .map(r => ({ source: r.sourceId, target: r.targetId, label: relationDef(r.type)?.label || r.type }));
+
+        simRef.current = { nodes, edges, width, height, stopped: false };
+
+        let frame = 0;
+        const step = () => {
+          const sim = simRef.current;
+          if (!sim || sim.stopped) return;
+          // 斥力（库仑）+ 引力（弹簧，按边）+ 向心力。
+          for (let i = 0; i < sim.nodes.length; i++) {
+            const a = sim.nodes[i];
+            for (let j = i + 1; j < sim.nodes.length; j++) {
+              const b = sim.nodes[j];
+              let dx = a.x - b.x, dy = a.y - b.y;
+              let d2 = dx * dx + dy * dy;
+              if (d2 < 1) { dx = (Math.random() - 0.5); dy = (Math.random() - 0.5); d2 = 1; }
+              const f = 2600 / d2;
+              const d = Math.sqrt(d2);
+              const fx = (dx / d) * f, fy = (dy / d) * f;
+              a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+            }
+          }
+          for (const e of sim.edges) {
+            const a = byId.get(e.source), b = byId.get(e.target);
+            if (!a || !b) continue;
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const d = Math.max(1, Math.hypot(dx, dy));
+            const rest = 150;
+            const f = (d - rest) * 0.012;
+            const fx = (dx / d) * f, fy = (dy / d) * f;
+            a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+          }
+          for (const n of sim.nodes) {
+            // 向心力 + 阻尼。
+            n.vx += (sim.width / 2 - n.x) * 0.0015;
+            n.vy += (sim.height / 2 - n.y) * 0.0015;
+            if (dragRef.current && dragRef.current.id === n.id) { n.vx = 0; n.vy = 0; continue; }
+            n.vx *= 0.82; n.vy *= 0.82;
+            n.x += n.vx; n.y += n.vy;
+            n.x = Math.max(30, Math.min(sim.width - 30, n.x));
+            n.y = Math.max(26, Math.min(sim.height - 26, n.y));
+          }
+          // 绘制。
+          ctx.clearRect(0, 0, sim.width, sim.height);
+          // 边。
+          for (const e of sim.edges) {
+            const a = byId.get(e.source), b = byId.get(e.target);
+            if (!a || !b) continue;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = 'rgba(128,134,148,0.4)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            // 箭头（指向 target）。
+            const ang = Math.atan2(b.y - a.y, b.x - a.x);
+            const r = 14;
+            const tipX = b.x - Math.cos(ang) * r, tipY = b.y - Math.sin(ang) * r;
+            ctx.beginPath();
+            ctx.moveTo(tipX, tipY);
+            ctx.lineTo(tipX - Math.cos(ang - 0.4) * 7, tipY - Math.sin(ang - 0.4) * 7);
+            ctx.lineTo(tipX - Math.cos(ang + 0.4) * 7, tipY - Math.sin(ang + 0.4) * 7);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(128,134,148,0.55)';
+            ctx.fill();
+          }
+          // 节点。
+          for (const n of sim.nodes) {
+            const entity = entities.find(e => e.id === n.id);
+            const color = colorOf(entity);
+            const highlighted = hoverId === n.id;
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, highlighted ? 13 : 10, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            if (highlighted) {
+              ctx.beginPath();
+              ctx.arc(n.x, n.y, 16, 0, Math.PI * 2);
+              ctx.strokeStyle = color;
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+            }
+            ctx.font = '11px system-ui, sans-serif';
+            ctx.fillStyle = 'var(--dsw-alias-label-primary)'.startsWith('var') ? '#9aa0ac' : '#9aa0ac';
+            ctx.textAlign = 'center';
+            ctx.fillText(n.title.slice(0, 8), n.x, n.y + 24);
+          }
+          frame = requestAnimationFrame(step);
+        };
+        frame = requestAnimationFrame(step);
+        return () => {
+          if (simRef.current) simRef.current.stopped = true;
+          cancelAnimationFrame(frame);
+        };
+      }, [entities.length, relations.length, hoverId]);
+
+      /** 命中检测 + 拖拽。 */
+      const pick = (evt) => {
+        const canvas = canvasRef.current;
+        const sim = simRef.current;
+        if (!canvas || !sim) return null;
+        const rect = canvas.getBoundingClientRect();
+        const x = evt.clientX - rect.left, y = evt.clientY - rect.top;
+        return sim.nodes.find(n => Math.hypot(n.x - x, n.y - y) <= 14) || null;
+      };
+      return h('div', { style: { position: 'relative' } },
+        h('canvas', {
+          ref: canvasRef,
+          style: {
+            borderRadius: 10, border: '1px solid var(--dsw-alias-border-l1)',
+            background: 'var(--dsw-alias-bg-layer-1)', display: 'block', cursor: 'grab',
+          },
+          onMouseDown: e => { const n = pick(e); if (n) dragRef.current = n; },
+          onMouseMove: e => {
+            const sim = simRef.current;
+            const n = pick(e);
+            setHoverId(n ? n.id : null);
+            if (dragRef.current && sim && n) {
+              const rect = e.currentTarget.getBoundingClientRect();
+              n.x = e.clientX - rect.left; n.y = e.clientY - rect.top;
+            }
+          },
+          onMouseUp: e => {
+            const n = pick(e);
+            if (n && !dragRef.current) actions.selectEntity(n.id);
+            dragRef.current = null;
+          },
+          onMouseLeave: () => { dragRef.current = null; setHoverId(null); },
+        }),
+        // 图例。
+        h('div', { style: { display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } },
+          Object.keys(TYPE_COLORS).map(type => h('span', { key: type, style: { display: 'inline-flex', alignItems: 'center', gap: 4 } },
+            h('span', { style: { width: 8, height: 8, borderRadius: 99, background: TYPE_COLORS[type], display: 'inline-block' } }),
+            ENTITY_TYPES.find(x => x.type === type)?.label || type,
+          ))),
+        entities.length === 0
+          ? h('div', { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--dsw-alias-label-secondary)' } }, t('graph.empty'))
+          : null,
+      );
+    }
+
+    // ─────────────────────────────────────────────
     // 工作台视图
     // ─────────────────────────────────────────────
 
@@ -595,9 +829,68 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** 数据管理区块：导出 / 导入 / 清空（JSON 全量，与 store state 同构）。 */
+    function DataSection(props) {
+      const { useStore, actions, t } = props;
+      const fileRef = React.useRef(null);
+      const snapshot = useStore(s => s.entities && s.relations ? { entities: s.entities, relations: s.relations } : null);
+      const [notice, setNotice] = React.useState('');
+
+      /** 导出：全量 JSON 下载。 */
+      const exportJson = () => {
+        if (!snapshot) return;
+        const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), ...snapshot }, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'worldsea-workbench-' + new Date().toISOString().slice(0, 10) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        setNotice(t('data.exported'));
+      };
+
+      /** 导入：合并（同名 id 覆盖）。
+       * @param file - 用户选择的 JSON 文件。
+       */
+      const importJson = async (file) => {
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          const entities = Array.isArray(data.entities) ? data.entities : [];
+          const relations = Array.isArray(data.relations) ? data.relations : [];
+          actions.importData(entities, relations);
+          setNotice(t('data.imported').replace('{n}', String(entities.length)));
+        } catch (_e) {
+          setNotice(t('data.importFailed'));
+        }
+      };
+
+      return h(Card, { pad: 14 },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' } },
+          h('div', { style: { fontSize: 14, fontWeight: 600 } }, t('data.title')),
+          h('div', { style: { flex: 1 } }),
+          h(GhostButton, { small: true, onClick: exportJson }, t('data.export')),
+          h(GhostButton, { small: true, onClick: () => fileRef.current && fileRef.current.click() }, t('data.import')),
+          h(GhostButton, {
+            small: true,
+            onClick: () => { if (window.confirm(t('data.clearConfirm'))) actions.clearAll(); },
+          }, t('data.clear')),
+          h('input', {
+            ref: fileRef, type: 'file', accept: '.json,application/json',
+            style: { display: 'none' },
+            onChange: e => { const f = e.target.files && e.target.files[0]; if (f) importJson(f); e.target.value = ''; },
+          }),
+        ),
+        snapshot ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
+          t('data.counts').replace('{e}', String(snapshot.entities.length)).replace('{r}', String(snapshot.relations.length))) : null,
+        notice ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-state-success-primary)', marginTop: 4 } }, notice) : null,
+      );
+    }
+
     /** 门户区块（工作台 portal tab 内容，v1 门户迁移）。 */
     function PortalSection(props) {
       const t = props.t;
+      const { useStore, actions } = props;
       const LINKS = [
         { id: 'repo', href: 'https://github.com/LINGTIAN303/WorldSea' },
         { id: 'pluginRepo', href: 'https://github.com/LINGTIAN303/dsh-worldsea' },
@@ -607,6 +900,8 @@ window.__ModuleLoader__.load({
         window.open('worldsea://localhost/', '_blank');
       }
       return h('div', null,
+        h(DataSection, { useStore, actions, t }),
+        h('div', { style: { height: 12 } }),
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 } },
           WorldIcon({ size: 36 }),
           h('div', null,
@@ -661,15 +956,18 @@ window.__ModuleLoader__.load({
       });
 
       return h('div', { style: { height: '100%', overflowY: 'auto', boxSizing: 'border-box', padding: 20 } },
-        // 顶部页签：工作台 / 门户
+        // 顶部页签：工作台 / 图谱 / 门户
         h('div', { style: { display: 'flex', gap: 8, marginBottom: 16 } },
           h('button', { onClick: () => actions.setView('workbench'), style: pill(view === 'workbench') }, t('tab.workbench')),
+          h('button', { onClick: () => actions.setView('graph'), style: pill(view === 'graph') }, t('tab.graph')),
           h('button', { onClick: () => actions.setView('portal'), style: pill(view === 'portal') }, t('tab.portal')),
         ),
 
         view === 'portal'
           ? PortalSection({ t })
-          : h('div', null,
+          : view === 'graph'
+            ? h(GraphView, { entities, relations, actions, t })
+            : h('div', null,
             // 类型切换条
             h('div', { style: { display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' } },
               ENTITY_TYPES.map(def => h('button', {
@@ -778,7 +1076,18 @@ window.__ModuleLoader__.load({
       'tagline': 'Agent 驱动的世界观构建平台',
       'intro': 'WorldSea 是一个本地优先的世界观创作平台。本工作台把 WorldSea 的创作能力带入 DSH：schema 驱动的实体管理（角色 / 区域 / 道具 / 魔法），数据本地持久化。',
       'tab.workbench': '工作台',
+      'tab.graph': '图谱',
       'tab.portal': '门户',
+      'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
+      'data.title': '数据管理',
+      'data.export': '导出 JSON',
+      'data.import': '导入 JSON',
+      'data.clear': '清空数据',
+      'data.clearConfirm': '确定清空全部实体与关系？此操作不可撤销（建议先导出备份）。',
+      'data.exported': '已导出。',
+      'data.imported': '已导入 {n} 个实体（含关系）。',
+      'data.importFailed': '导入失败：文件不是有效的 JSON 或结构不符。',
+      'data.counts': '当前：{e} 个实体 · {r} 条关系',
       'tab.title': 'WorldSea',
       'guide.title': 'WorldSea 工作台',
       'guide.description': '世界观创作工作台：实体管理与门户',
@@ -816,7 +1125,18 @@ window.__ModuleLoader__.load({
       'tagline': 'Agent-powered worldbuilding platform',
       'intro': 'WorldSea is a local-first worldbuilding platform. This workbench brings its creative capabilities into DSH: schema-driven entity management (characters / regions / items / magic), persisted locally.',
       'tab.workbench': 'Workbench',
+      'tab.graph': 'Graph',
       'tab.portal': 'Portal',
+      'graph.empty': 'No entities to draw yet; create some in the workbench first.',
+      'data.title': 'Data',
+      'data.export': 'Export JSON',
+      'data.import': 'Import JSON',
+      'data.clear': 'Clear all',
+      'data.clearConfirm': 'Clear ALL entities and relations? This cannot be undone (export a backup first).',
+      'data.exported': 'Exported.',
+      'data.imported': 'Imported {n} entities (with relations).',
+      'data.importFailed': 'Import failed: not valid JSON or unexpected structure.',
+      'data.counts': 'Now: {e} entities · {r} relations',
       'tab.title': 'WorldSea',
       'guide.title': 'WorldSea workbench',
       'guide.description': 'Worldbuilding workbench: entity management and portal',
