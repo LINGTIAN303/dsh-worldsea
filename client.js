@@ -435,18 +435,13 @@ window.__ModuleLoader__.load({
       const candidates = entities.filter(e => e.id !== selfId && (wanted.length === 0 || wanted.includes(e.type)));
       const titleOf = id => entities.find(e => e.id === id)?.title || id;
 
-      /** 本实体的关系边（显示视图）。 */
+      /** 本实体的关系边（显示视图）：统一按「源 —标签→ 目标」渲染，方向由边本身表达。 */
       const rows = relations
         .filter(r => r.sourceId === selfId || r.targetId === selfId)
-        .map(r => {
-          const outgoing = r.sourceId === selfId;
-          return {
-            id: r.id,
-            text: outgoing
-              ? `${titleOf(r.sourceId)} —${relationDef(r.type)?.label || r.type}→ ${titleOf(r.targetId)}`
-              : `${titleOf(r.sourceId)} —${relationDef(r.type)?.label || r.type}→ ${titleOf(r.targetId)}`,
-          };
-        });
+        .map(r => ({
+          id: r.id,
+          text: `${titleOf(r.sourceId)} —${relationDef(r.type)?.label || r.type}→ ${titleOf(r.targetId)}`,
+        }));
 
       return h(Card, { pad: 14 },
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 } },
@@ -564,11 +559,11 @@ window.__ModuleLoader__.load({
         const ctx = canvas.getContext('2d');
         ctx.scale(2, 2);
 
-        // 初始化模拟：节点圆布局起步。
+        // 初始化模拟：节点圆布局起步 + 类型→颜色查找表（避免每帧 find）。
         const nodes = entities.map((e, i) => {
           const angle = (2 * Math.PI * i) / Math.max(1, entities.length);
           return {
-            id: e.id, title: e.title, type: e.type,
+            id: e.id, title: e.title, type: e.type, color: colorOf(e),
             x: width / 2 + Math.cos(angle) * Math.min(width, height) * 0.3,
             y: height / 2 + Math.sin(angle) * Math.min(width, height) * 0.3,
             vx: 0, vy: 0,
@@ -644,8 +639,7 @@ window.__ModuleLoader__.load({
           }
           // 节点。
           for (const n of sim.nodes) {
-            const entity = entities.find(e => e.id === n.id);
-            const color = colorOf(entity);
+            const color = n.color;
             const highlighted = hoverId === n.id;
             ctx.beginPath();
             ctx.arc(n.x, n.y, highlighted ? 13 : 10, 0, Math.PI * 2);
@@ -658,8 +652,9 @@ window.__ModuleLoader__.load({
               ctx.lineWidth = 1.5;
               ctx.stroke();
             }
+            // canvas 不解析 CSS var：标签用固定中性灰（亮暗主题下均可读）。
             ctx.font = '11px system-ui, sans-serif';
-            ctx.fillStyle = 'var(--dsw-alias-label-primary)'.startsWith('var') ? '#9aa0ac' : '#9aa0ac';
+            ctx.fillStyle = '#9aa0ac';
             ctx.textAlign = 'center';
             ctx.fillText(n.title.slice(0, 8), n.x, n.y + 24);
           }
@@ -964,7 +959,7 @@ window.__ModuleLoader__.load({
         ),
 
         view === 'portal'
-          ? PortalSection({ t })
+          ? h(PortalSection, { t, useStore, actions })
           : view === 'graph'
             ? h(GraphView, { entities, relations, actions, t })
             : h('div', null,
