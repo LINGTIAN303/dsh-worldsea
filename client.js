@@ -109,15 +109,134 @@ window.__ModuleLoader__.load({
       { key: 'origin', label: '起源地', fieldType: 'text' },
     ];
 
-    /** 实体类型注册表（manifest 对齐 WorldSea 官方插件形态）。 */
+    /** 建筑（WorldSea official.buildings ownFields 原样抄录）。 */
+    const BUILDING_FIELDS = [
+      { key: 'buildingType', label: '类型', fieldType: 'select', options: ['城堡', '宫殿', '寺庙', '酒馆', '商店', '工坊', '图书馆', '学院', '兵营', '监狱', '港口', '塔楼', '城墙', '民居', '地下城', '其他'] },
+      { key: 'floors', label: '层数', fieldType: 'text' },
+      { key: 'area', label: '面积', fieldType: 'text' },
+      { key: 'style', label: '建筑风格', fieldType: 'select', options: ['哥特', '罗马', '东方', '精灵', '矮人', '蒸汽朋克', '未来', '原始', '混合', '其他'] },
+      { key: 'era', label: '建造年代', fieldType: 'text' },
+      { key: 'builder', label: '建造者', fieldType: 'text' },
+      { key: 'materials', label: '主要建材', fieldType: 'textarea' },
+      { key: 'significance', label: '历史意义', fieldType: 'textarea' },
+    ];
+
+    /** 生物（WorldSea official.creatures ownFields 原样抄录）。 */
+    const CREATURE_FIELDS = [
+      { key: 'creatureType', label: '类别', fieldType: 'select', options: ['走兽', '飞禽', '水族', '虫豸', '魔兽', '异种', '元素生物', '不死生物', '机械造物', '其他'] },
+      { key: 'dangerLevel', label: '危险度', fieldType: 'select', options: ['无害', '低危', '中危', '高危', '灾厄'] },
+      { key: 'diet', label: '食性', fieldType: 'select', options: ['草食', '肉食', '杂食', '腐食', '吸能', '未知'] },
+      { key: 'size', label: '体型', fieldType: 'select', options: ['微型', '小型', '中型', '大型', '巨型', '超巨'] },
+      { key: 'temperament', label: '性情', fieldType: 'select', options: ['温顺', '胆小', '领地意识', '凶猛', '群袭', '不可预测'] },
+      { key: 'habitat', label: '栖息环境', fieldType: 'text' },
+      { key: 'abilities', label: '能力', fieldType: 'textarea' },
+      { key: 'weakness', label: '弱点', fieldType: 'textarea' },
+      { key: 'yield', label: '产出物', fieldType: 'text' },
+    ];
+
+    /** 植物（WorldSea official.plants ownFields；multi-select 降级为 text，逗号分隔）。 */
+    const PLANT_FIELDS = [
+      { key: 'plantType', label: '类型', fieldType: 'select', options: ['药草', '树木', '菌类', '魔法植物', '花卉', '谷物', '水生植物', '藤本', '其他'] },
+      { key: 'habitat', label: '生长环境', fieldType: 'text' },
+      { key: 'usage', label: '用途（逗号分隔）', fieldType: 'text' },
+      { key: 'toxicity', label: '毒性/副作用', fieldType: 'textarea' },
+      { key: 'growthCycle', label: '生长周期', fieldType: 'text' },
+      { key: 'relatedProducts', label: '制成品', fieldType: 'textarea' },
+    ];
+
+    /** 语言（WorldSea official.languages ownFields 原样抄录）。 */
+    const LANGUAGE_FIELDS = [
+      { key: 'langType', label: '语言类型', fieldType: 'select', options: ['自然语言', '人造语言', '古代语言', '暗语/密语', '手语', '心灵感应', '其他'] },
+      { key: 'scriptType', label: '文字类型', fieldType: 'select', options: ['表音文字', '表意文字', '音节文字', '象形文字', '符文', '无文字', '混合'] },
+      { key: 'languageFamily', label: '语系', fieldType: 'text' },
+      { key: 'scope', label: '使用范围', fieldType: 'select', options: ['全球通用', '区域通用', '种族语言', '少数族群', '已灭绝', '特定群体'] },
+      { key: 'maturity', label: '成熟度', fieldType: 'select', options: ['完整语言', '基础词汇表', '仅有短语', '发展中'] },
+      { key: 'phonology', label: '音系特点', fieldType: 'textarea' },
+      { key: 'grammar', label: '语法特点', fieldType: 'textarea' },
+      { key: 'vocabulary', label: '词汇示例', fieldType: 'textarea' },
+      { key: 'sampleText', label: '文字示例', fieldType: 'textarea' },
+    ];
+
+    /** 概念（WorldSea official.concepts ownFields；tags 降级为 text）。 */
+    const CONCEPT_FIELDS = [
+      { key: 'conceptType', label: '类型', fieldType: 'select', options: ['概念', '规则', '魔法', '科技', '文化', '历史', '宗教', '生物', '语言', '社会制度', '其他'] },
+      { key: 'definition', label: '定义', fieldType: 'textarea' },
+      { key: 'aliases', label: '别名/同义词', fieldType: 'text' },
+    ];
+
+    /** 信仰（WorldSea official.faith ownFields 原样抄录）。 */
+    const FAITH_FIELDS = [
+      { key: 'faithType', label: '信仰类型', fieldType: 'select', options: ['多神教', '一神教', '泛灵信仰', '祖先崇拜', '图腾崇拜', '哲学信条', '秘密教派', '其他'] },
+      { key: 'deities', label: '神祇', fieldType: 'textarea' },
+      { key: 'doctrine', label: '核心教义', fieldType: 'textarea' },
+      { key: 'origin', label: '起源传说', fieldType: 'textarea' },
+      { key: 'ritual', label: '主要仪式', fieldType: 'textarea' },
+      { key: 'taboo', label: '禁忌', fieldType: 'textarea' },
+      { key: 'scripture', label: '经文圣典', fieldType: 'text' },
+      { key: 'holySymbol', label: '圣徽圣物', fieldType: 'text' },
+      { key: 'clergy', label: '神职体系', fieldType: 'textarea' },
+      { key: 'scope', label: '传播范围', fieldType: 'select', options: ['世界主流', '区域国教', '民间信仰', '秘密教派', '已消亡', '其他'] },
+    ];
+
+    /** 文化（WorldSea official.culture ownFields 原样抄录）。 */
+    const CULTURE_FIELDS = [
+      { key: 'cultureType', label: '类型', fieldType: 'select', options: ['节日', '仪式', '禁忌', '婚俗', '丧葬', '饮食', '服饰', '艺术', '建筑风格', '其他'] },
+      { key: 'cycle', label: '周期', fieldType: 'text' },
+      { key: 'origin', label: '起源', fieldType: 'textarea' },
+      { key: 'participants', label: '参与者', fieldType: 'textarea' },
+      { key: 'significance', label: '意义/象征', fieldType: 'textarea' },
+      { key: 'practices', label: '具体做法', fieldType: 'textarea' },
+    ];
+
+    /** 冲突（WorldSea official.conflict ownFields 原样抄录）。 */
+    const CONFLICT_FIELDS = [
+      { key: 'conflictType', label: '类型', fieldType: 'select', options: ['全面战争', '局部冲突', '内战', '起义', '侵略', '防御战', '冷冲突', '贸易战', '其他'] },
+      { key: 'scale', label: '规模', fieldType: 'select', options: ['全球', '区域', '国家', '地方', '小规模'] },
+      { key: 'cause', label: '起因', fieldType: 'textarea' },
+      { key: 'result', label: '结果', fieldType: 'textarea' },
+      { key: 'casualties', label: '伤亡', fieldType: 'textarea' },
+      { key: 'treaty', label: '和约/停战协议', fieldType: 'textarea' },
+    ];
+
+    /** 事件（WorldSea official.timeline event；datable trait 摊平为 date/dateEnd 字段）。 */
+    const EVENT_FIELDS = [
+      { key: 'date', label: '日期/纪年', fieldType: 'text' },
+      { key: 'dateEnd', label: '结束日期', fieldType: 'text' },
+      { key: 'importance', label: '重要程度', fieldType: 'select', options: ['关键', '重要', '普通', '细微'] },
+      { key: 'status', label: '状态', fieldType: 'select', options: ['正史', '废案', '备选'] },
+      { key: 'location', label: '发生地点', fieldType: 'text' },
+    ];
+
+    /** 实体类型注册表（manifest 对齐 WorldSea 官方插件形态；15 类覆盖创作域主力，按域分组）。 */
     const ENTITY_TYPES = [
       { type: 'character', label: '角色', domain: 'life', fields: CHARACTER_FIELDS, glyph: 'user' },
+      { type: 'species', label: '物种', domain: 'life', fields: SPECIES_FIELDS, glyph: 'paw' },
+      { type: 'creature', label: '生物', domain: 'life', fields: CREATURE_FIELDS, glyph: 'paw' },
+      { type: 'plant', label: '植物', domain: 'life', fields: PLANT_FIELDS, glyph: 'leaf' },
       { type: 'region', label: '区域', domain: 'geo', fields: REGION_FIELDS, glyph: 'map' },
+      { type: 'building', label: '建筑', domain: 'geo', fields: BUILDING_FIELDS, glyph: 'house' },
       { type: 'item', label: '道具', domain: 'goods', fields: ITEM_FIELDS, glyph: 'item' },
       { type: 'magic', label: '魔法', domain: 'arcane', fields: MAGIC_FIELDS, glyph: 'spark' },
       { type: 'organization', label: '组织', domain: 'society', fields: ORGANIZATION_FIELDS, glyph: 'org' },
-      { type: 'species', label: '物种', domain: 'life', fields: SPECIES_FIELDS, glyph: 'paw' },
+      { type: 'language', label: '语言', domain: 'society', fields: LANGUAGE_FIELDS, glyph: 'chat' },
+      { type: 'faith', label: '信仰', domain: 'society', fields: FAITH_FIELDS, glyph: 'star' },
+      { type: 'culture', label: '文化', domain: 'society', fields: CULTURE_FIELDS, glyph: 'mask' },
+      { type: 'concept', label: '概念', domain: 'knowledge', fields: CONCEPT_FIELDS, glyph: 'bulb' },
+      { type: 'conflict', label: '冲突', domain: 'history', fields: CONFLICT_FIELDS, glyph: 'swords' },
+      { type: 'event', label: '事件', domain: 'history', fields: EVENT_FIELDS, glyph: 'clock' },
     ];
+
+    /** 域分组（类型条的第一级页签）。 */
+    const DOMAINS = [
+      { id: 'life', label: '生命' },
+      { id: 'geo', label: '地理' },
+      { id: 'goods', label: '物品' },
+      { id: 'arcane', label: '奥秘' },
+      { id: 'society', label: '社会' },
+      { id: 'knowledge', label: '知识' },
+      { id: 'history', label: '历史' },
+    ];
+    const DOMAIN_LABEL = new Map(DOMAINS.map(d => [d.id, d.label]));
 
     // ─────────────────────────────────────────────
     // 关系类型（对齐 WorldSea RelationTypeSchemaV2：有向 + 强制逆关系）
@@ -165,6 +284,7 @@ window.__ModuleLoader__.load({
         entities: [],
         relations: [],
         view: 'workbench',
+        activeDomain: 'life',
         activeType: 'character',
         selectedId: null,
         editing: false,
@@ -173,8 +293,15 @@ window.__ModuleLoader__.load({
       }),
       persist: PERSIST_KEY,
       actions: {
-        /** 视图切换（工作台 / 门户）。 */
+        /** 视图切换（工作台 / 图谱 / 门户）。 */
         setView(draft, view) { draft.view = view; if (view !== 'workbench') { draft.editing = false; draft.draft = null; } },
+        /** 切换域：自动落到该域第一个类型。 */
+        selectDomain(draft, domain) {
+          draft.activeDomain = domain;
+          const first = ENTITY_TYPES.find(def => def.domain === domain);
+          if (first) draft.activeType = first.type;
+          draft.selectedId = null; draft.editing = false; draft.draft = null;
+        },
         /** 切换实体类型：清选中与编辑态。 */
         selectType(draft, type) { draft.activeType = type; draft.selectedId = null; draft.editing = false; draft.draft = null; },
         /** 搜索词。 */
@@ -402,6 +529,49 @@ window.__ModuleLoader__.load({
           return h('svg', common,
             h('path', { d: 'M12 2v6M12 16v6M2 12h6M16 12h6' }),
             h('circle', { cx: 12, cy: 12, r: 3 }));
+        case 'org':
+          return h('svg', common,
+            h('rect', { x: 3, y: 7, width: 7, height: 13 }),
+            h('rect', { x: 14, y: 3, width: 7, height: 17 }),
+            h('path', { d: 'M6.5 11h.01M6.5 15h.01M17.5 7h.01M17.5 11h.01M17.5 15h.01' }));
+        case 'paw':
+          return h('svg', common,
+            h('ellipse', { cx: 7, cy: 8, rx: 1.6, ry: 2.2 }),
+            h('ellipse', { cx: 12, cy: 6.5, rx: 1.6, ry: 2.2 }),
+            h('ellipse', { cx: 17, cy: 8, rx: 1.6, ry: 2.2 }),
+            h('path', { d: 'M12 11c-3.5 0-6 2.6-6 5.2 0 1.6 1.2 2.8 2.8 2.8 1.2 0 2-.6 3.2-.6s2 .6 3.2.6c1.6 0 2.8-1.2 2.8-2.8 0-2.6-2.5-5.2-6-5.2z' }));
+        case 'house':
+          return h('svg', common,
+            h('path', { d: 'M3 11 12 4l9 7' }),
+            h('path', { d: 'M5 10v10h14V10' }),
+            h('path', { d: 'M10 20v-6h4v6' }));
+        case 'leaf':
+          return h('svg', common,
+            h('path', { d: 'M6 21C6 12 10 4 20 3c0 10-4 15-11 15' }),
+            h('path', { d: 'M6 21c0-5 2-9 7-12' }));
+        case 'chat':
+          return h('svg', common,
+            h('path', { d: 'M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z' }),
+            h('path', { d: 'M9 11h6' }));
+        case 'bulb':
+          return h('svg', common,
+            h('path', { d: 'M9 18h6M10 21h4' }),
+            h('path', { d: 'M12 3a6 6 0 0 0-4 10.5c.8.7 1 1.5 1 2.5h6c0-1 .2-1.8 1-2.5A6 6 0 0 0 12 3z' }));
+        case 'star':
+          return h('svg', common,
+            h('path', { d: 'M12 3l2.7 5.7 6.3.8-4.6 4.3 1.2 6.2L12 17l-5.6 3 1.2-6.2L3 9.5l6.3-.8L12 3z' }));
+        case 'mask':
+          return h('svg', common,
+            h('path', { d: 'M4 5h16v6a8 8 0 0 1-16 0V5z' }),
+            h('path', { d: 'M8 10h.01M16 10h.01M9 15c1 .8 2 1.2 3 1.2s2-.4 3-1.2' }));
+        case 'swords':
+          return h('svg', common,
+            h('path', { d: 'M4 4l9 9M4 4v4M4 4h4M20 4l-9 9M20 4v4M20 4h-4' }),
+            h('path', { d: 'M13.5 13.5L18 18M18 15.5 15.5 18 20 20l-2-4.5zM10.5 13.5 6 18M6 15.5 8.5 18 4 20l2-4.5z' }));
+        case 'clock':
+          return h('svg', common,
+            h('circle', { cx: 12, cy: 12, r: 8.5 }),
+            h('path', { d: 'M12 7v5l3.5 2' }));
         default:
           return h('svg', common, h('circle', { cx: 12, cy: 12, r: 8 }));
       }
@@ -546,6 +716,9 @@ window.__ModuleLoader__.load({
       const TYPE_COLORS = {
         character: '#4f8ef7', region: '#4caf7d', item: '#e6a23c',
         magic: '#9a6dd7', organization: '#e67e8b', species: '#3fb8af',
+        building: '#8d7355', creature: '#c0653a', plant: '#5f9e4c',
+        language: '#4a90a4', concept: '#7f8fa6', faith: '#d4a017',
+        culture: '#b565a7', conflict: '#d9534f', event: '#5bc0de',
       };
       const colorOf = e => TYPE_COLORS[e.type] || '#8a8f9d';
 
@@ -928,12 +1101,15 @@ window.__ModuleLoader__.load({
       const { useStore, actions, t } = props;
       const entities = useStore(s => s.entities);
       const relations = useStore(s => s.relations);
+      const activeDomain = useStore(s => s.activeDomain);
       const activeType = useStore(s => s.activeType);
       const selectedId = useStore(s => s.selectedId);
       const view = useStore(s => s.view);
       const search = useStore(s => s.search);
 
       const typeDef = ENTITY_TYPES.find(x => x.type === activeType) || ENTITY_TYPES[0];
+      // 旧持久化数据可能缺 activeDomain：按当前类型回推。
+      const domain = activeDomain || typeDef.domain;
       const kw = search.trim();
       const list = entities
         .filter(e => e.type === typeDef.type)
@@ -964,9 +1140,26 @@ window.__ModuleLoader__.load({
           : view === 'graph'
             ? h(GraphView, { entities, relations, actions, t })
             : h('div', null,
-            // 类型切换条
+            // 域页签（第一级）
+            h('div', { style: { display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' } },
+              DOMAINS.map(d => {
+                const count = entities.filter(e => ENTITY_TYPES.find(t => t.type === e.type)?.domain === d.id).length;
+                return h('button', {
+                  key: d.id,
+                  onClick: () => actions.selectDomain(d.id),
+                  style: {
+                    padding: '3px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12,
+                    border: 'none',
+                    background: d.id === domain ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-1)',
+                    color: d.id === domain ? '#fff' : 'var(--dsw-alias-label-primary)',
+                    fontWeight: d.id === domain ? 600 : 400,
+                  },
+                }, d.label + (count ? ' (' + count + ')' : ''));
+              }),
+            ),
+            // 类型切换条（第二级：当前域内的类型）
             h('div', { style: { display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' } },
-              ENTITY_TYPES.map(def => h('button', {
+              ENTITY_TYPES.filter(def => def.domain === domain).map(def => h('button', {
                 key: def.type,
                 onClick: () => actions.selectType(def.type),
                 style: {
