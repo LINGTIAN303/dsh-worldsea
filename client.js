@@ -281,8 +281,10 @@ window.__ModuleLoader__.load({
       { type: 'owns', label: '拥有', inverseType: 'owned_by', inverseLabel: '被拥有', symmetric: false, sourceTypes: ['character', 'organization'], targetTypes: ['item'] },
     ];
 
-    /** 按类型查关系定义。 */
+    /** 按类型查关系定义（内置表；自定义类型经合并查找 allRelationDefs）。 */
     const relationDef = (type) => RELATION_TYPES.find(r => r.type === type);
+    /** 内置 + 自定义合并查找。customs 为 store 中的 customRelationTypes 数组。 */
+    const allRelationDefs = (customs) => customs && customs.length ? [...RELATION_TYPES, ...customs] : RELATION_TYPES;
 
     /**
      * autoLink 规则（对齐 WorldSea AutoLinkEngine 核心规则表）：
@@ -350,6 +352,8 @@ window.__ModuleLoader__.load({
       init: () => ({
         entities: [],
         relations: [],
+        /** 用户自定义关系类型（对齐 WorldSea isCustom；与内置 RELATION_TYPES 合并生效）。 */
+        customRelationTypes: [],
         view: 'workbench',
         activeDomain: 'life',
         activeType: 'character',
@@ -465,11 +469,11 @@ window.__ModuleLoader__.load({
         },
         /**
          * 建关系：有向边 source→target；非对称关系自动补逆边（pairId 互指）。
-         * 对称关系（inverseType === type）只建一条边。
+         * 对称关系（inverseType === type）只建一条边。支持内置与自定义类型。
          */
         addRelation(draft, type, sourceId, targetId) {
           if (sourceId === targetId) return;
-          const def = relationDef(type);
+          const def = allRelationDefs(draft.customRelationTypes).find(r => r.type === type);
           if (!def) return;
           const now = new Date().toISOString();
           const id = 'rel-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
@@ -530,13 +534,47 @@ window.__ModuleLoader__.load({
             }
           }
         },
-        /** 清空全部创作数据（实体 + 关系）。 */
+        /** 清空全部创作数据（实体 + 关系 + 自定义关系类型）。 */
         clearAll(draft) {
           draft.entities = [];
           draft.relations = [];
+          draft.customRelationTypes = [];
           draft.selectedId = null;
           draft.editing = false;
           draft.draft = null;
+        },
+        /** 新增自定义关系类型（强制声明逆关系；对称则 inverseType=type）。 */
+        addCustomRelationType(draft, def) {
+          if (!def || !def.type || !def.label) return;
+          const type = def.type.trim();
+          if (!type) return;
+          if (relationDef(type) || draft.customRelationTypes.some(r => r.type === type)) return;
+          draft.customRelationTypes.push({
+            type,
+            label: def.label.trim() || type,
+            inverseType: def.symmetric ? type : (def.inverseType || type).trim(),
+            inverseLabel: def.symmetric ? (def.label.trim() || type) : (def.inverseLabel || def.label || type).trim(),
+            symmetric: !!def.symmetric,
+            sourceTypes: [],
+            targetTypes: [],
+            isCustom: true,
+          });
+        },
+        /** 删除自定义关系类型：同时删掉该类型的关系边（含逆边）。 */
+        removeCustomRelationType(draft, type) {
+          const def = draft.customRelationTypes.find(r => r.type === type);
+          if (!def) return;
+          const doomedTypes = new Set([type, def.inverseType]);
+          // 只删自定义的：内置关系类型不出现在 customRelationTypes，逆边若属内置类型仅删本侧。
+          draft.relations = draft.relations.filter(r => {
+            if (r.type === type) return false;
+            if (r.type === def.inverseType && def.inverseType !== type) {
+              // 逆边类型可能是内置的：仅当它也属于被删类型对时删。
+              return !(r.pairId && !draft.relations.some(x => x.id === r.pairId && x.type === type));
+            }
+            return true;
+          });
+          draft.customRelationTypes = draft.customRelationTypes.filter(r => r.type !== type);
         },
       },
     });
@@ -680,33 +718,39 @@ window.__ModuleLoader__.load({
     // 关系区块（详情页）
     // ─────────────────────────────────────────────
 
-    /** 实体详情页的关系区块：已有关系列表 + 新建关系表单。 */
+    /** 实体详情页的关系区块：已有关系列表 + 新建关系表单 + 自定义关系类型管理。 */
     function RelationsSection(props) {
-      const { relations, entities, selfId, actions, t } = props;
+      const { relations, entities, selfId, customRelationTypes, actions, t } = props;
       const [relType, setRelType] = React.useState(RELATION_TYPES[0].type);
       const [targetId, setTargetId] = React.useState('');
       const [direction, setDirection] = React.useState('out');
-      const def = relationDef(relType);
+      const [showCustom, setShowCustom] = React.useState(false);
+      const [newType, setNewType] = React.useState('');
+      const [newLabel, setNewLabel] = React.useState('');
+      const [newInverse, setNewInverse] = React.useState('');
+      const [newInverseLabel, setNewInverseLabel] = React.useState('');
+      const allDefs = allRelationDefs(customRelationTypes);
+      const def = allDefs.find(r => r.type === relType) || RELATION_TYPES[0];
 
       // 目标候选：允许的 target/source 类型 + 排除自身。
       const wanted = direction === 'out' ? def.targetTypes : def.sourceTypes;
       const candidates = entities.filter(e => e.id !== selfId && (wanted.length === 0 || wanted.includes(e.type)));
       const titleOf = id => entities.find(e => e.id === id)?.title || id;
 
-      /** 本实体的关系边（显示视图）：统一按「源 —标签→ 目标」渲染，方向由边本身表达。 */
+      /** 本实体的关系边（显示视图）：统一按「源 —标签→ 目标」渲染。 */
       const rows = relations
         .filter(r => r.sourceId === selfId || r.targetId === selfId)
-        .map(r => ({
-          id: r.id,
-          text: `${titleOf(r.sourceId)} —${relationDef(r.type)?.label || r.type}→ ${titleOf(r.targetId)}`,
-        }));
+        .map(r => {
+          const label = allDefs.find(x => x.type === r.type)?.label || r.type;
+          return { id: r.id, text: `${titleOf(r.sourceId)} —${label}→ ${titleOf(r.targetId)}` };
+        });
 
       return h(Card, { pad: 14 },
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 } },
           h('div', { style: { fontSize: 14, fontWeight: 600 } }, t('relations.title')),
           h('div', { style: { flex: 1 } }),
           h('select', { value: relType, onChange: e => setRelType(e.target.value), style: { ...inputStyle, width: 'auto' } },
-            RELATION_TYPES.map(r => h('option', { key: r.type, value: r.type }, r.label))),
+            allDefs.map(r => h('option', { key: r.type, value: r.type }, r.label + (r.isCustom ? ' ★' : '')))),
           h('select', { value: direction, onChange: e => setDirection(e.target.value), style: { ...inputStyle, width: 'auto' } },
             h('option', { value: 'out' }, t('relations.outgoing')),
             h('option', { value: 'in' }, t('relations.incoming'))),
@@ -724,7 +768,50 @@ window.__ModuleLoader__.load({
               setTargetId('');
             },
           }, t('relations.add')),
+          h(GhostButton, { small: true, onClick: () => setShowCustom(!showCustom) }, t('relations.customToggle')),
         ),
+        // 自定义关系类型面板。
+        showCustom ? h('div', {
+          style: {
+            marginBottom: 10, padding: 10, borderRadius: 8,
+            background: 'var(--dsw-alias-bg-layer-2)', fontSize: 12,
+          },
+        },
+          h('div', { style: { fontWeight: 600, marginBottom: 6 } }, t('relations.customTitle')),
+          h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' } },
+            h('input', { value: newType, placeholder: t('relations.customKey'), onChange: e => setNewType(e.target.value), style: { ...inputStyle, width: 110 } }),
+            h('input', { value: newLabel, placeholder: t('relations.customLabel'), onChange: e => setNewLabel(e.target.value), style: { ...inputStyle, width: 90 } }),
+            h('input', { value: newInverse, placeholder: t('relations.customInverseKey'), onChange: e => setNewInverse(e.target.value), style: { ...inputStyle, width: 110 } }),
+            h('input', { value: newInverseLabel, placeholder: t('relations.customInverseLabel'), onChange: e => setNewInverseLabel(e.target.value), style: { ...inputStyle, width: 90 } }),
+            h(PrimaryButton, {
+              small: true,
+              onClick: () => {
+                if (!newType.trim() || !newLabel.trim()) return;
+                actions.addCustomRelationType({
+                  type: newType, label: newLabel,
+                  inverseType: newInverse || newType, inverseLabel: newInverseLabel || newLabel,
+                  symmetric: newInverse.trim() === newType.trim(),
+                });
+                setNewType(''); setNewLabel(''); setNewInverse(''); setNewInverseLabel('');
+              },
+            }, t('relations.customAdd')),
+          ),
+          customRelationTypes.length ? h('div', { style: { marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' } },
+            customRelationTypes.map(r => h('span', {
+              key: r.type,
+              style: {
+                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px',
+                borderRadius: 999, background: 'var(--dsw-alias-bg-layer-1)',
+                border: '1px solid var(--dsw-alias-border-l1)',
+              },
+            },
+              r.label + '（' + r.type + (r.symmetric ? ' ⇄ 自身' : ' ⇄ ' + r.inverseType) + '）',
+              h('button', {
+                onClick: () => actions.removeCustomRelationType(r.type),
+                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-state-error-primary)', padding: 0, fontSize: 11 },
+              }, '×'),
+            ))) : null,
+        ) : null,
         rows.length === 0
           ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('relations.empty'))
           : h('div', null, rows.map(row => h('div', {
@@ -1133,7 +1220,7 @@ window.__ModuleLoader__.load({
 
     /** 实体详情/编辑面板。 */
     function EntityDetail(props) {
-      const { useStore, actions, entity, fields, allRelations, allEntities, onBack, t } = props;
+      const { useStore, actions, entity, fields, allRelations, allEntities, customRelationTypes, onBack, t } = props;
       const editing = useStore(s => s.editing);
       const draft = useStore(s => s.draft);
 
@@ -1161,7 +1248,7 @@ window.__ModuleLoader__.load({
             })),
           ),
           h('div', { style: { marginTop: 12 } },
-            h(RelationsSection, { relations: allRelations, entities: allEntities, selfId: entity.id, actions, t })),
+            h(RelationsSection, { relations: allRelations, entities: allEntities, selfId: entity.id, customRelationTypes, actions, t })),
         );
       }
 
@@ -1301,6 +1388,7 @@ window.__ModuleLoader__.load({
       const selectedId = useStore(s => s.selectedId);
       const view = useStore(s => s.view);
       const search = useStore(s => s.search);
+      const customRelationTypes = useStore(s => s.customRelationTypes || []);
 
       const typeDef = ENTITY_TYPES.find(x => x.type === activeType) || ENTITY_TYPES[0];
       // 旧持久化数据可能缺 activeDomain：按当前类型回推。
@@ -1437,7 +1525,7 @@ window.__ModuleLoader__.load({
             ),
 
             selected
-              ? h(EntityDetail, { useStore, actions, entity: selected, fields: typeDef.fields, allRelations: relations, allEntities: entities, t, onBack: () => actions.selectEntity(null) })
+              ? h(EntityDetail, { useStore, actions, entity: selected, fields: typeDef.fields, allRelations: relations, allEntities: entities, customRelationTypes, t, onBack: () => actions.selectEntity(null) })
               : h('div', null,
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 } },
                   h('h3', { style: { margin: 0, fontSize: 15 } }, typeDef.label + ' · ' + t('workbench.list')),
@@ -1569,6 +1657,13 @@ window.__ModuleLoader__.load({
       'relations.pickTarget': '选实体…',
       'relations.empty': '尚无关系；选类型与实体后「连边」。',
       'relations.hint': '非对称关系自动创建反向边；删除一边时逆边同删。',
+      'relations.customToggle': '自定义',
+      'relations.customTitle': '自定义关系类型（有向 + 逆关系；对称关系逆方向填同名）',
+      'relations.customKey': '类型键（英文）',
+      'relations.customLabel': '显示名',
+      'relations.customInverseKey': '逆类型键',
+      'relations.customInverseLabel': '逆显示名',
+      'relations.customAdd': '添加类型',
       'tags.addPlaceholder': '+标签',
       'detail.back': '返回',
       'detail.edit': '编辑',
@@ -1633,6 +1728,13 @@ window.__ModuleLoader__.load({
       'relations.pickTarget': 'Pick entity…',
       'relations.empty': 'No relations yet; pick a type and an entity, then "Link".',
       'relations.hint': 'Asymmetric relations auto-create the inverse edge; deleting one edge removes its inverse.',
+      'relations.customToggle': 'Custom',
+      'relations.customTitle': 'Custom relation types (directed + inverse; symmetric types repeat the same key)',
+      'relations.customKey': 'Type key (ascii)',
+      'relations.customLabel': 'Label',
+      'relations.customInverseKey': 'Inverse key',
+      'relations.customInverseLabel': 'Inverse label',
+      'relations.customAdd': 'Add type',
       'tags.addPlaceholder': '+tag',
       'detail.back': 'Back',
       'detail.edit': 'Edit',
