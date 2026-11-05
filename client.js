@@ -261,11 +261,56 @@ window.__ModuleLoader__.load({
 
     /** 按类型查关系定义。 */
     const relationDef = (type) => RELATION_TYPES.find(r => r.type === type);
-    /** 对称关系的逆关系是自身。 */
-    const inverseOf = (type) => {
-      const def = relationDef(type);
-      return def ? { type: def.inverseType, label: def.inverseLabel } : null;
-    };
+
+    /**
+     * autoLink 规则（对齐 WorldSea AutoLinkEngine 核心规则表）：
+     * 实体保存时扫描字段值，按规则自动建 belongs_to 关系。
+     * 每条规则：字段名匹配（正则）→ 目标类型 + 关系类型。
+     */
+    const AUTO_LINK_RULES = [
+      { fieldPattern: /^(race|species|种族|物种)$/i, targetType: 'species', relationType: 'belongs_to' },
+      { fieldPattern: /^(affiliation|faction|所属势力|所属组织|所属)$/i, targetType: 'organization', relationType: 'belongs_to' },
+      { fieldPattern: /^(owner|origin|originated|source|来源|持有者)$/i, targetType: 'character', relationType: 'owned_by' },
+      { fieldPattern: /^(habitat|origin|栖息环境|起源地)$/i, targetType: 'region', relationType: 'resides_in' },
+    ];
+
+    /**
+     * 保存实体时执行 autoLink：字段值能唯一匹配同类型已存实体标题时建边。
+     * 已有同型同目标关系则跳过（幂等）。
+     * @param draft - store 草稿。
+     * @param entity - 已提交的实体。
+     */
+    function applyAutoLink(draft, entity) {
+      const created = [];
+      for (const rule of AUTO_LINK_RULES) {
+        for (const [key, value] of Object.entries(entity.properties || {})) {
+          if (!rule.fieldPattern.test(key) || typeof value !== 'string' || !value.trim()) continue;
+          const targets = draft.entities.filter(e =>
+            e.type === rule.targetType
+            && (e.title === value.trim() || e.title.includes(value.trim()) || value.trim().includes(e.title)));
+          const target = targets[0];
+          if (!target || target.id === entity.id) continue;
+          // 幂等：同型同向同目标已存在则跳过。
+          const exists = draft.relations.some(r =>
+            r.type === rule.relationType && r.sourceId === entity.id && r.targetId === target.id);
+          if (exists) continue;
+          const def = relationDef(rule.relationType);
+          const now = new Date().toISOString();
+          const id = 'rel-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+          const symmetric = def.inverseType === def.type;
+          const pairId = symmetric ? undefined : 'rel-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+          draft.relations.push({ id, type: rule.relationType, sourceId: entity.id, targetId: target.id, properties: {}, pairId, createdAt: now, updatedAt: now });
+          if (!symmetric) {
+            draft.relations.push({
+              id: pairId, type: def.inverseType, sourceId: target.id, targetId: entity.id,
+              properties: {}, pairId: id, createdAt: now, updatedAt: now,
+            });
+          }
+          created.push(value.trim() + '←' + (def.label));
+        }
+      }
+      return created;
+    }
 
     // ─────────────────────────────────────────────
     // 单一 store：实体库 + 工作台会话态（持久化到 localStorage）
@@ -348,7 +393,7 @@ window.__ModuleLoader__.load({
         },
         /** 取消编辑。 */
         cancelEdit(draft) { draft.editing = false; draft.draft = null; },
-        /** 提交编辑：单 draft 内写实体 + 退出编辑态。 */
+        /** 提交编辑：单 draft 内写实体 + 退出编辑态 + autoLink。 */
         commitEdit(draft) {
           if (!draft.editing || !draft.draft || !draft.selectedId) return;
           const entity = draft.entities.find(e => e.id === draft.selectedId);
@@ -357,6 +402,7 @@ window.__ModuleLoader__.load({
           entity.description = draft.draft.description;
           entity.properties = draft.draft.properties;
           entity.updatedAt = new Date().toISOString();
+          applyAutoLink(draft, entity);
           draft.editing = false;
           draft.draft = null;
         },
@@ -1208,8 +1254,30 @@ window.__ModuleLoader__.load({
         color: active ? '#fff' : 'var(--dsw-alias-label-primary)',
       });
 
+      /** 统计带：实体总数 / 关系总数 / 标签数 / 最近更新。 */
+      const tagCount = new Set(entities.flatMap(e => e.tags)).size;
+      const latest = entities.reduce((acc, e) => (e.updatedAt > acc ? e.updatedAt : acc), '');
+      const stats = [
+        { label: t('stats.entities'), value: entities.length },
+        { label: t('stats.relations'), value: relations.length },
+        { label: t('stats.tags'), value: tagCount },
+        { label: t('stats.updated'), value: latest ? latest.slice(0, 10) : '—' },
+      ];
+
       return h('div', { style: { height: '100%', overflowY: 'auto', boxSizing: 'border-box', padding: 20 } },
-        // 顶部页签：工作台 / 图谱 / 门户
+        // 统计带。
+        h('div', { style: { display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' } },
+          stats.map(s => h('div', {
+            key: s.label,
+            style: {
+              flex: '1 1 120px', padding: '8px 14px', borderRadius: 10,
+              background: 'var(--dsw-alias-bg-layer-1)', border: '1px solid var(--dsw-alias-border-l1)',
+            },
+          },
+            h('div', { style: { fontSize: 18, fontWeight: 700, color: 'var(--dsw-alias-label-primary)' } }, s.value),
+            h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, s.label),
+          ))),
+        // 顶部页签：工作台 / 图谱 / 时间线 / 门户
         h('div', { style: { display: 'flex', gap: 8, marginBottom: 16 } },
           h('button', { onClick: () => actions.setView('workbench'), style: pill(view === 'workbench') }, t('tab.workbench')),
           h('button', { onClick: () => actions.setView('graph'), style: pill(view === 'graph') }, t('tab.graph')),
@@ -1356,6 +1424,10 @@ window.__ModuleLoader__.load({
       'timeline.title': '时间线',
       'timeline.empty': '时间线为空：给实体（主要是「事件」）的「日期/纪年」字段填上日期后自动上图。',
       'timeline.undated': '未定日期',
+      'stats.entities': '实体',
+      'stats.relations': '关系',
+      'stats.tags': '标签',
+      'stats.updated': '最近更新',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -1409,6 +1481,10 @@ window.__ModuleLoader__.load({
       'timeline.title': 'Timeline',
       'timeline.empty': 'Timeline is empty: fill in the "Date" field of entities (mainly "Event") and they appear here.',
       'timeline.undated': 'Undated',
+      'stats.entities': 'Entities',
+      'stats.relations': 'Relations',
+      'stats.tags': 'Tags',
+      'stats.updated': 'Last updated',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
