@@ -539,7 +539,8 @@ window.__ModuleLoader__.load({
       const canvasRef = React.useRef(null);
       const simRef = React.useRef(null);
       const dragRef = React.useRef(null);
-      const [hoverId, setHoverId] = React.useState(null);
+      // 高亮走 ref（画布每帧自读），避免 hover 触发 useEffect 重挂载而重置布局。
+      const hoverRef = React.useRef(null);
 
       /** 类型 → 颜色（避开主题 token 无法用于 canvas 的限制，用固定语义色）。 */
       const TYPE_COLORS = {
@@ -640,7 +641,7 @@ window.__ModuleLoader__.load({
           // 节点。
           for (const n of sim.nodes) {
             const color = n.color;
-            const highlighted = hoverId === n.id;
+            const highlighted = hoverRef.current === n.id;
             ctx.beginPath();
             ctx.arc(n.x, n.y, highlighted ? 13 : 10, 0, Math.PI * 2);
             ctx.fillStyle = color;
@@ -665,7 +666,7 @@ window.__ModuleLoader__.load({
           if (simRef.current) simRef.current.stopped = true;
           cancelAnimationFrame(frame);
         };
-      }, [entities.length, relations.length, hoverId]);
+      }, [entities.length, relations.length]);
 
       /** 命中检测 + 拖拽。 */
       const pick = (evt) => {
@@ -687,7 +688,7 @@ window.__ModuleLoader__.load({
           onMouseMove: e => {
             const sim = simRef.current;
             const n = pick(e);
-            setHoverId(n ? n.id : null);
+            hoverRef.current = n ? n.id : null;
             if (dragRef.current && sim && n) {
               const rect = e.currentTarget.getBoundingClientRect();
               n.x = e.clientX - rect.left; n.y = e.clientY - rect.top;
@@ -698,7 +699,7 @@ window.__ModuleLoader__.load({
             if (n && !dragRef.current) actions.selectEntity(n.id);
             dragRef.current = null;
           },
-          onMouseLeave: () => { dragRef.current = null; setHoverId(null); },
+          onMouseLeave: () => { dragRef.current = null; hoverRef.current = null; },
         }),
         // 图例。
         h('div', { style: { display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } },
