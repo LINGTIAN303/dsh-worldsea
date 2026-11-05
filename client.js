@@ -238,6 +238,28 @@ window.__ModuleLoader__.load({
     ];
     const DOMAIN_LABEL = new Map(DOMAINS.map(d => [d.id, d.label]));
 
+    /**
+     * 实体示例模板（对齐 WorldSea templates 思路：每类型一份示例预填，快速上手）。
+     * createFromTemplate 时合并进 properties，标题加「示例」前缀可改。
+     */
+    const ENTITY_TEMPLATES = {
+      character: { title: '示例角色', properties: { age: '24', gender: '女', race: '精灵', occupation: '游侠', role: '主角', personality: '冷静寡言，重诺', } },
+      region: { title: '示例区域', properties: { regionType: '城市', climate: '温带海洋', population: '约 12 万', government: '共和制', } },
+      item: { title: '示例道具', properties: { itemType: '武器', grade: '传说', material: '秘银', condition: '完好', } },
+      magic: { title: '示例法术', properties: { system: '元素魔法', element: '火', tier: '三环', castTime: '2 秒', range: '30 米', } },
+      organization: { title: '示例组织', properties: { orgType: '公会', size: '大型', alignment: '守序中立', motto: '以信立会', } },
+      species: { title: '示例物种', properties: { speciesType: '精灵', avgLifespan: '800 年', language: '精灵语', } },
+      building: { title: '示例建筑', properties: { buildingType: '酒馆', style: '东方', era: '旧王朝末期', } },
+      creature: { title: '示例生物', properties: { creatureType: '魔兽', dangerLevel: '高危', diet: '肉食', size: '大型', temperament: '凶猛', } },
+      plant: { title: '示例植物', properties: { plantType: '药草', usage: '炼金, 食用', growthCycle: '一年生', } },
+      language: { title: '示例语言', properties: { langType: '人造语言', scriptType: '符文', scope: '种族语言', maturity: '基础词汇表', } },
+      concept: { title: '示例概念', properties: { conceptType: '规则', definition: '本世界魔法消耗的是使用者寿命。', } },
+      faith: { title: '示例信仰', properties: { faithType: '多神教', scope: '区域国教', } },
+      culture: { title: '示例文化', properties: { cultureType: '节日', cycle: '每年秋分', } },
+      conflict: { title: '示例冲突', properties: { conflictType: '局部冲突', scale: '区域', } },
+      event: { title: '示例事件', properties: { date: '元年 春', importance: '关键', status: '正史', } },
+    };
+
     // ─────────────────────────────────────────────
     // 关系类型（对齐 WorldSea RelationTypeSchemaV2：有向 + 强制逆关系）
     // 复刻日常创作最高频的 12 类；对称关系 inverseType 指向自身。
@@ -362,6 +384,26 @@ window.__ModuleLoader__.load({
             title: title || '未命名',
             description: '',
             properties: {},
+            tags: [],
+            createdAt: now,
+            updatedAt: now,
+          };
+          draft.entities.push(entity);
+          draft.selectedId = entity.id;
+          draft.editing = false;
+          draft.draft = null;
+        },
+        /** 按示例模板新建：标题与预填字段一并写入。 */
+        createFromTemplate(draft, type) {
+          const tpl = ENTITY_TEMPLATES[type];
+          if (!tpl) { return; }
+          const now = new Date().toISOString();
+          const entity = {
+            id: newEntityId(),
+            type,
+            title: tpl.title,
+            description: '',
+            properties: { ...tpl.properties },
             tags: [],
             createdAt: now,
             updatedAt: now,
@@ -757,6 +799,9 @@ window.__ModuleLoader__.load({
       const dragRef = React.useRef(null);
       // 高亮走 ref（画布每帧自读），避免 hover 触发 useEffect 重挂载而重置布局。
       const hoverRef = React.useRef(null);
+      // 边类型筛选（'' = 全部；变化经 deps 重挂载）。
+      const [edgeFilter, setEdgeFilter] = React.useState('');
+      const usedLabels = [...new Set(relations.map(r => relationDef(r.type)?.label || r.type))].sort();
 
       /** 类型 → 颜色（避开主题 token 无法用于 canvas 的限制，用固定语义色）。 */
       const TYPE_COLORS = {
@@ -836,8 +881,9 @@ window.__ModuleLoader__.load({
           }
           // 绘制。
           ctx.clearRect(0, 0, sim.width, sim.height);
-          // 边。
-          for (const e of sim.edges) {
+          // 边（过滤视图：edgeFilter 变化经 deps 重挂载生效）。
+          const visibleEdges = sim.edges.filter(e => !edgeFilter || e.label === edgeFilter);
+          for (const e of visibleEdges) {
             const a = byId.get(e.source), b = byId.get(e.target);
             if (!a || !b) continue;
             ctx.beginPath();
@@ -856,6 +902,17 @@ window.__ModuleLoader__.load({
             ctx.closePath();
             ctx.fillStyle = 'rgba(128,134,148,0.55)';
             ctx.fill();
+            // 边标签（中点，带底色条保证可读）。
+            if (visibleEdges.length <= 40) {
+              const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+              ctx.font = '10px system-ui, sans-serif';
+              const tw = ctx.measureText(e.label).width;
+              ctx.fillStyle = 'rgba(30,32,38,0.72)';
+              ctx.fillRect(mx - tw / 2 - 3, my - 8, tw + 6, 14);
+              ctx.fillStyle = '#c8ccd4';
+              ctx.textAlign = 'center';
+              ctx.fillText(e.label, mx, my + 3);
+            }
           }
           // 节点。
           for (const n of sim.nodes) {
@@ -885,7 +942,7 @@ window.__ModuleLoader__.load({
           if (simRef.current) simRef.current.stopped = true;
           cancelAnimationFrame(frame);
         };
-      }, [entities.length, relations.length]);
+      }, [entities.length, relations.length, edgeFilter]);
 
       /** 命中检测 + 拖拽。 */
       const pick = (evt) => {
@@ -897,6 +954,17 @@ window.__ModuleLoader__.load({
         return sim.nodes.find(n => Math.hypot(n.x - x, n.y - y) <= 14) || null;
       };
       return h('div', { style: { position: 'relative' } },
+        // 边筛选条。
+        h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' } },
+          h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('graph.filter')),
+          h('select', {
+            value: edgeFilter,
+            onChange: e => setEdgeFilter(e.target.value),
+            style: { ...inputStyle, width: 'auto', padding: '3px 8px', fontSize: 12 },
+          },
+            h('option', { value: '' }, t('graph.allRelations')),
+            usedLabels.map(label => h('option', { key: label, value: label }, label))),
+        ),
         h('canvas', {
           ref: canvasRef,
           style: {
@@ -1340,6 +1408,7 @@ window.__ModuleLoader__.load({
                     style: { ...inputStyle, width: 180, padding: '4px 10px', fontSize: 12 },
                   }),
                   h('div', { style: { flex: 1 } }),
+                  h(GhostButton, { small: true, onClick: () => actions.createFromTemplate(typeDef.type) }, t('workbench.newFromTemplate')),
                   h(PrimaryButton, { small: true, onClick: () => actions.create(typeDef.type, t('workbench.untitled')) }, t('workbench.new')),
                 ),
                 list.length === 0
@@ -1421,6 +1490,8 @@ window.__ModuleLoader__.load({
       'tab.timeline': '时间线',
       'tab.portal': '门户',
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
+      'graph.filter': '只看关系',
+      'graph.allRelations': '全部关系',
       'timeline.title': '时间线',
       'timeline.empty': '时间线为空：给实体（主要是「事件」）的「日期/纪年」字段填上日期后自动上图。',
       'timeline.undated': '未定日期',
@@ -1444,6 +1515,7 @@ window.__ModuleLoader__.load({
       'workbench.new': '新建',
       'workbench.empty': '暂无实体，点「新建」开始创作。',
       'workbench.untitled': '未命名',
+      'workbench.newFromTemplate': '示例模板',
       'workbench.searchPlaceholder': '搜索标题 / 标签 / 字段…',
       'relations.title': '关系',
       'relations.add': '连边',
@@ -1478,6 +1550,8 @@ window.__ModuleLoader__.load({
       'tab.timeline': 'Timeline',
       'tab.portal': 'Portal',
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
+      'graph.filter': 'Show relation',
+      'graph.allRelations': 'All relations',
       'timeline.title': 'Timeline',
       'timeline.empty': 'Timeline is empty: fill in the "Date" field of entities (mainly "Event") and they appear here.',
       'timeline.undated': 'Undated',
@@ -1501,6 +1575,7 @@ window.__ModuleLoader__.load({
       'workbench.new': 'New',
       'workbench.empty': 'No entities yet. Click "New" to start.',
       'workbench.untitled': 'Untitled',
+      'workbench.newFromTemplate': 'From template',
       'workbench.searchPlaceholder': 'Search title / tag / field…',
       'relations.title': 'Relations',
       'relations.add': 'Link',
