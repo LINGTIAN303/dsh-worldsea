@@ -287,10 +287,10 @@ window.__ModuleLoader__.load({
       { type: 'conflict', label: '冲突', domain: 'history', fields: CONFLICT_FIELDS, glyph: 'swords' },
       { type: 'event', label: '事件', domain: 'history', fields: EVENT_FIELDS, glyph: 'clock' },
       { type: 'combat_stat', label: '战力体系', domain: 'arcane', fields: COMBAT_STAT_FIELDS, glyph: 'shield' },
-      { type: 'notebook', label: '笔记', domain: 'knowledge', fields: NOTEBOOK_FIELDS, glyph: 'note' },
-      { type: 'outline_node', label: '大纲节点', domain: 'history', fields: OUTLINE_NODE_FIELDS, glyph: 'tree' },
-      { type: 'book', label: '书籍', domain: 'history', fields: BOOK_FIELDS, glyph: 'book' },
-      { type: 'manuscript', label: '正文', domain: 'history', fields: MANUSCRIPT_FIELDS, glyph: 'manuscript' },
+      { type: 'notebook', label: '笔记', domain: 'narrative', fields: NOTEBOOK_FIELDS, glyph: 'note' },
+      { type: 'outline_node', label: '大纲节点', domain: 'narrative', fields: OUTLINE_NODE_FIELDS, glyph: 'tree' },
+      { type: 'book', label: '书籍', domain: 'narrative', fields: BOOK_FIELDS, glyph: 'book' },
+      { type: 'manuscript', label: '正文', domain: 'narrative', fields: MANUSCRIPT_FIELDS, glyph: 'manuscript' },
     ];
 
     /**
@@ -302,15 +302,16 @@ window.__ModuleLoader__.load({
       { hostType: 'item', id: 'apparel', label: '服饰特性', fields: APPAREL_FACET_FIELDS, glyph: 'mask' },
     ];
 
-    /** 域分组（类型条的第一级页签）。 */
+    /** 域分组（对齐 WorldSea 资产地图 8 域：名称与语义取自原生首页截图）。 */
     const DOMAINS = [
-      { id: 'life', label: '生命' },
-      { id: 'geo', label: '地理' },
-      { id: 'goods', label: '物品' },
-      { id: 'arcane', label: '奥秘' },
-      { id: 'society', label: '社会' },
-      { id: 'knowledge', label: '知识' },
-      { id: 'history', label: '历史' },
+      { id: 'geo', label: '地理与场所', hint: '世界在哪里、由哪些地点构成', glyph: 'map' },
+      { id: 'life', label: '生命与族群', hint: '谁生活在这个世界、有哪些生命形态', glyph: 'user' },
+      { id: 'society', label: '社会与文明', hint: '他们如何组织、交流、冲突', glyph: 'org' },
+      { id: 'knowledge', label: '知识与规则', hint: '世界运行依赖哪些设定、规则与力量体系', glyph: 'bulb' },
+      { id: 'goods', label: '物产与造物', hint: '世界里有哪些物品、装备与造物', glyph: 'item' },
+      { id: 'history', label: '时间与事件', hint: '世界发生了什么、按什么顺序发生', glyph: 'clock' },
+      { id: 'narrative', label: '叙事与文本', hint: '如何把世界组织成可写的文本', glyph: 'manuscript' },
+      { id: 'arcane', label: '推演与工具', hint: '用什么工具观察、推演、编排', glyph: 'spark' },
     ];
     const DOMAIN_LABEL = new Map(DOMAINS.map(d => [d.id, d.label]));
 
@@ -443,7 +444,7 @@ window.__ModuleLoader__.load({
         customRelationTypes: [],
         /** 用户自定义实体类型（对齐 WorldSea EntityTypeSchema.customFields；与内置 ENTITY_TYPES 合并生效）。 */
         customEntityTypes: [],
-        view: 'workbench',
+        view: 'home',
         activeDomain: 'life',
         activeType: 'character',
         selectedId: null,
@@ -1340,6 +1341,131 @@ window.__ModuleLoader__.load({
         if (!e.title.trim()) issues.push({ kind: 'emptyTitle', id: e.id, label: e.id, text: e.type });
       }
       return issues;
+    }
+
+    /**
+     * 首页表面（对齐 WorldSea 首页截图）：Hero 卡（品牌字标 + 项目名 + 简介 + 主行动）+
+     * 统计卡行（实体/关系/大纲/正文）+ 资产地图（8 域卡片：图标/名称/计数/提示/类型 chips/箭头）。
+     */
+    function HomeView(props) {
+      const { entities, allTypes, relations, actions, t } = props;
+      /** 项目名取 store 内书名/首卷名，缺省回退「尚未命名」。 */
+      const projectName = entities.find(e => e.type === 'book')?.title || t('home.untitled');
+      const stats = [
+        { label: t('home.statEntities'), value: entities.filter(e => !['outline_node', 'book', 'manuscript'].includes(e.type)).length },
+        { label: t('home.statRelations'), value: relations.length },
+        { label: t('home.statOutline'), value: entities.filter(e => e.type === 'outline_node').length },
+        { label: t('home.statManuscript'), value: entities.filter(e => e.type === 'manuscript').length },
+      ];
+      /** 资产地图卡片：域 + 该域实体数 + 类型 chips（前 2 个 + "+N"）。 */
+      const assetCards = DOMAINS.map(d => {
+        const types = allTypes.filter(def => def.domain === d.id);
+        const count = entities.filter(e => types.some(t2 => t2.type === e.type)).length;
+        return { domain: d, count, chips: types.slice(0, 2), extra: Math.max(0, types.length - 2) };
+      });
+
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: DS.space.lg, minHeight: 0 } },
+        // Hero 卡：渐变暗绿底 + 品牌字标 + 项目名 + 简介 + 主行动。
+        h('div', {
+          style: {
+            position: 'relative', borderRadius: DS.radius.md, padding: DS.space.xxl,
+            background: `linear-gradient(120deg, var(--ws-bg-surface) 35%, color-mix(in srgb, var(--ws-accent) 16%, var(--ws-bg-surface)) 100%)`,
+            border: '1px solid var(--ws-border)', overflow: 'hidden',
+          },
+        },
+          h('div', { style: { fontSize: DS.font.xs, letterSpacing: '0.18em', color: 'var(--ws-accent)', fontWeight: 600, marginBottom: DS.space.md } }, 'WORLDSEA · ' + t('home.heroTag')),
+          h('div', { style: { fontSize: 44, fontWeight: 700, color: 'var(--ws-text-primary)', lineHeight: 1.15, marginBottom: DS.space.md } }, projectName),
+          h('div', { style: { fontSize: DS.font.lg, color: 'var(--ws-text-secondary)', marginBottom: DS.space.md } }, t('home.noIntro')),
+          h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-muted)', marginBottom: DS.space.lg } },
+            t('home.heroMeta').replace('{n}', String(allTypes.length))),
+          h('div', { style: { display: 'flex', gap: DS.space.lg, alignItems: 'center', marginBottom: DS.space.md } },
+            h('button', {
+              onClick: () => { actions.selectType('character'); actions.setView('workbench'); },
+              style: {
+                ...dsControlBase, display: 'inline-flex', alignItems: 'center', gap: DS.space.sm,
+                padding: '9px 18px', borderRadius: DS.radius.sm, border: 'none', cursor: 'pointer',
+                background: 'var(--ws-accent)', color: 'var(--ws-on-accent)', fontSize: DS.font.md, fontWeight: 600,
+              },
+              onMouseOver: e => { e.currentTarget.style.background = 'var(--ws-accent-hover)'; },
+              onMouseOut: e => { e.currentTarget.style.background = 'var(--ws-accent)'; },
+            }, '→ ' + t('home.ctaCreate')),
+            h('button', {
+              onClick: () => actions.setView('workbench'),
+              style: { ...dsControlBase, padding: '9px 14px', borderRadius: DS.radius.sm, border: 'none', background: 'transparent', color: 'var(--ws-text-secondary)', fontSize: DS.font.md, cursor: 'pointer' },
+              onMouseOver: e => { e.currentTarget.style.color = 'var(--ws-text-primary)'; },
+              onMouseOut: e => { e.currentTarget.style.color = 'var(--ws-text-secondary)'; },
+            }, '🔍 ' + t('home.searchWorld')),
+          ),
+          h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)' } }, t('home.heroHint')),
+        ),
+        // 统计卡行。
+        h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: DS.space.md } },
+          stats.map(s => h('div', {
+            key: s.label,
+            style: {
+              padding: DS.space.lg, borderRadius: DS.radius.md,
+              background: 'var(--ws-bg-surface)', border: '1px solid var(--ws-border)',
+            },
+          },
+            h('div', { style: { fontSize: 30, fontWeight: 700, color: 'var(--ws-text-primary)', lineHeight: 1.1 } }, String(s.value)),
+            h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginTop: DS.space.xs } }, s.label),
+          ))),
+        // 资产地图。
+        h('div', null,
+          h('div', { style: { display: 'flex', alignItems: 'baseline', gap: DS.space.md, marginBottom: DS.space.md } },
+            h('div', { style: { fontSize: DS.font.lg, fontWeight: 700, color: 'var(--ws-text-primary)' } }, t('home.assetMap')),
+            h('div', { style: { flex: 1 } }),
+            h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)' } }, t('home.assetMapNote')),
+          ),
+          h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: DS.space.md } },
+            assetCards.map(({ domain: d, count, chips, extra }) => h('div', {
+              key: d.id,
+              onClick: () => { actions.selectDomain(d.id); actions.setView('workbench'); },
+              style: {
+                ...dsControlBase, cursor: 'pointer', padding: DS.space.lg,
+                borderRadius: DS.radius.md, background: 'var(--ws-bg-surface)', border: '1px solid var(--ws-border)',
+              },
+              onMouseOver: e => { e.currentTarget.style.borderColor = 'var(--ws-border-strong)'; },
+              onMouseOut: e => { e.currentTarget.style.borderColor = 'var(--ws-border)'; },
+            },
+              h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.md, marginBottom: DS.space.md } },
+                h('div', {
+                  style: {
+                    width: 34, height: 34, borderRadius: DS.radius.mid, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'var(--ws-bg-muted)', color: 'var(--ws-text-secondary)',
+                  },
+                }, h(TypeGlyph, { glyph: d.glyph, size: 16 })),
+                h('div', { style: { flex: 1, minWidth: 0 } },
+                  h('div', { style: { fontSize: DS.font.base, fontWeight: 600, color: 'var(--ws-text-primary)' } }, d.label),
+                  h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)', lineHeight: 1.5 } }, d.hint),
+                ),
+                h('div', { style: { display: 'flex', alignItems: 'baseline', gap: DS.space.xs } },
+                  h('span', { style: { fontSize: DS.font.xl, fontWeight: 700, color: 'var(--ws-text-primary)' } }, String(count)),
+                  h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)' } }, t('home.entitiesUnit')),
+                ),
+                h('span', { style: { color: 'var(--ws-text-muted)', fontSize: DS.font.lg } }, '→'),
+              ),
+              h('div', { style: { display: 'flex', gap: DS.space.xs, flexWrap: 'wrap', marginBottom: DS.space.md } },
+                chips.map(c => h('span', {
+                  key: c.type,
+                  style: {
+                    display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px',
+                    borderRadius: DS.radius.pill, fontSize: DS.font.xs,
+                    background: 'var(--ws-bg-muted)', border: '1px solid var(--ws-border)', color: 'var(--ws-text-secondary)',
+                  },
+                }, h(TypeGlyph, { glyph: c.glyph, size: 10 }), c.label)),
+                extra > 0 ? h('span', {
+                  style: {
+                    display: 'inline-flex', padding: '2px 8px', borderRadius: DS.radius.pill,
+                    fontSize: DS.font.xs, background: 'var(--ws-bg-muted)', border: '1px solid var(--ws-border)', color: 'var(--ws-text-secondary)',
+                  },
+                }, '+' + extra) : null,
+              ),
+              h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)' } }, count ? t('home.hasContent') : t('home.noContent')),
+            ))),
+        ),
+      );
     }
 
     /**
@@ -2492,13 +2618,14 @@ window.__ModuleLoader__.load({
         { label: t('stats.updated'), value: latest ? latest.slice(0, 10) : '—' },
       ];
 
-      /** 面板内导航项（分组：创作 / 可视 / 维护）。 */
+      /** 面板内导航项（分组：首页 / 创作 / 可视 / 维护——首页对齐 WorldSea 表面切换）。 */
       const NAV_GROUPS = [
+        { id: 'home', label: t('nav.home'), items: ['home'] },
         { id: 'create', label: t('nav.create'), items: ['workbench', 'writing', 'manuscript'] },
         { id: 'visual', label: t('nav.visual'), items: ['graph', 'timeline', 'codex'] },
         { id: 'maintain', label: t('nav.maintain'), items: ['health', 'portal'] },
       ];
-      const NAV_GLYPHS = { workbench: 'grid', writing: 'note', manuscript: 'manuscript', graph: 'graph', timeline: 'clock', codex: 'book', health: 'shield', portal: 'globe' };
+      const NAV_GLYPHS = { home: 'globe', workbench: 'grid', writing: 'note', manuscript: 'manuscript', graph: 'graph', timeline: 'clock', codex: 'book', health: 'shield', portal: 'globe' };
       /** 导航行（图标 + 文字；active = accent-soft 弱底 + accent 字，对齐 WorldSea .ws-sn-view.active）。 */
       const navRow = (id) => {
         const active = view === id;
@@ -2607,7 +2734,9 @@ window.__ModuleLoader__.load({
 
         view === 'portal'
           ? h(PortalSection, { t, useStore, actions })
-          : view === 'graph'
+          : view === 'home'
+            ? h(HomeView, { entities, allTypes, relations, actions, t })
+            : view === 'graph'
             ? h(GraphView, { entities, relations, actions, t })
             : view === 'timeline'
               ? h(TimelineView, { entities, actions, t })
@@ -2886,9 +3015,27 @@ window.__ModuleLoader__.load({
       'tab.manuscript': '手稿',
       'workbench.cycleDomain': '点击轮转域',
       'tab.portal': '门户',
+      'tab.home': '首页',
+      'nav.home': '表面',
       'nav.create': '创作',
       'nav.visual': '可视化',
       'nav.maintain': '维护',
+      'home.heroTag': '项目首页',
+      'home.untitled': '未命名世界',
+      'home.noIntro': '尚未填写简介',
+      'home.heroMeta': '已启用芽 {n} 项',
+      'home.ctaCreate': '开始创建：角色',
+      'home.searchWorld': '搜索世界',
+      'home.heroHint': '从下方资产地图进入任意域，或按 Ctrl+K 搜索。',
+      'home.statEntities': '实体',
+      'home.statRelations': '关系',
+      'home.statOutline': '大纲',
+      'home.statManuscript': '正文',
+      'home.assetMap': '资产地图',
+      'home.assetMapNote': '当前启用的芽 · 计数含跨域',
+      'home.entitiesUnit': '实体',
+      'home.hasContent': '已有内容',
+      'home.noContent': '尚无内容',
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
       'graph.filter': '只看关系',
       'graph.allRelations': '全部关系',
@@ -3023,9 +3170,27 @@ window.__ModuleLoader__.load({
       'tab.manuscript': 'Manuscript',
       'workbench.cycleDomain': 'Click to cycle domain',
       'tab.portal': 'Portal',
+      'tab.home': 'Home',
+      'nav.home': 'Surface',
       'nav.create': 'Create',
       'nav.visual': 'Visualize',
       'nav.maintain': 'Maintain',
+      'home.heroTag': 'Project home',
+      'home.untitled': 'Untitled world',
+      'home.noIntro': 'No introduction yet',
+      'home.heroMeta': '{n} sprouts enabled',
+      'home.ctaCreate': 'Start creating: character',
+      'home.searchWorld': 'Search world',
+      'home.heroHint': 'Enter any domain from the asset map below, or press Ctrl+K to search.',
+      'home.statEntities': 'Entities',
+      'home.statRelations': 'Relations',
+      'home.statOutline': 'Outline',
+      'home.statManuscript': 'Manuscript',
+      'home.assetMap': 'Asset map',
+      'home.assetMapNote': 'Enabled sprouts · counts span domains',
+      'home.entitiesUnit': 'entities',
+      'home.hasContent': 'Has content',
+      'home.noContent': 'Empty',
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
       'graph.filter': 'Show relation',
       'graph.allRelations': 'All relations',
