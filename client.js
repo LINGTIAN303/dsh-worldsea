@@ -530,6 +530,11 @@ window.__ModuleLoader__.load({
           else delete rel.properties.note;
           rel.updatedAt = new Date().toISOString();
         },
+        /** 清理悬挂关系：端点实体已不存在的关系边（含逆边）。 */
+        pruneDanglingRelations(draft) {
+          const ids = new Set(draft.entities.map(e => e.id));
+          draft.relations = draft.relations.filter(r => ids.has(r.sourceId) && ids.has(r.targetId));
+        },
         /** 批量模式切换。 */
         toggleBatchMode(draft) { draft.batchMode = !draft.batchMode; draft.batchSelection = []; },
         /** 批量选择切换。 */
@@ -1022,6 +1027,96 @@ window.__ModuleLoader__.load({
           },
           style: { ...inputStyle, width: 120, padding: '2px 8px', fontSize: 12 },
         }),
+      );
+    }
+
+    /**
+     * 完整性校验（对齐 worldsea-core CoreReferenceCheckResult 语义）：
+     * 悬挂关系（端点实体已不存在）、重复标题（同类型内）、空标题。
+     * @param entities - 全部实体。
+     * @param relations - 全部关系。
+     * @returns 问题列表，每项带可操作的修复入口所需信息。
+     */
+    function runHealthCheck(entities, relations) {
+      const issues = [];
+      const byId = new Map(entities.map(e => [e.id, e]));
+      // 悬挂关系：端点丢失。
+      for (const r of relations) {
+        const missingSource = !byId.has(r.sourceId);
+        const missingTarget = !byId.has(r.targetId);
+        if (missingSource || missingTarget) {
+          issues.push({
+            kind: 'danglingRelation',
+            id: r.id,
+            label: (missingSource ? r.sourceId : '') + (missingSource && missingTarget ? ' / ' : '') + (missingTarget ? r.targetId : ''),
+            text: `${r.type}: ${r.sourceId} → ${r.targetId}`,
+          });
+        }
+      }
+      // 重复标题（同类型内）：记录每组。
+      const seen = new Map();
+      for (const e of entities) {
+        const key = e.type + '::' + e.title;
+        if (!seen.has(key)) seen.set(key, []);
+        seen.get(key).push(e);
+      }
+      for (const [key, group] of seen) {
+        if (group.length > 1) {
+          issues.push({ kind: 'duplicateTitle', id: key, label: group.map(e => e.title).join(' ≡ '), text: `${group.length} × ${key.split('::')[1]}` });
+        }
+      }
+      // 空标题。
+      for (const e of entities) {
+        if (!e.title.trim()) issues.push({ kind: 'emptyTitle', id: e.id, label: e.id, text: e.type });
+      }
+      return issues;
+    }
+
+    /** 健康检查视图：运行校验 + 一键修复（悬挂关系删除、空标题重命名）。 */
+    function HealthView(props) {
+      const { entities, relations, actions, t } = props;
+      const [report, setReport] = React.useState(null);
+      const run = () => setReport(runHealthCheck(entities, relations));
+      const dangling = report ? report.filter(i => i.kind === 'danglingRelation') : [];
+      return h('div', null,
+        h(Card, { pad: 14 },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 } },
+            h('div', { style: { fontSize: 14, fontWeight: 600 } }, t('health.title')),
+            h('div', { style: { flex: 1 } }),
+            h(PrimaryButton, { small: true, onClick: run }, t('health.run')),
+          ),
+          !report
+            ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('health.hint'))
+            : report.length === 0
+              ? h('div', { style: { fontSize: 13, color: 'var(--dsw-alias-state-success-primary)' } }, t('health.clean'))
+              : h('div', null,
+                h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginBottom: 8 } },
+                  t('health.summary')
+                    .replace('{d}', String(dangling.length))
+                    .replace('{dup}', String(report.filter(i => i.kind === 'duplicateTitle').length))
+                    .replace('{e}', String(report.filter(i => i.kind === 'emptyTitle').length))),
+                dangling.length ? h(GhostButton, {
+                  small: true,
+                  onClick: () => { actions.pruneDanglingRelations(); setReport(runHealthCheck(entities, relations)); },
+                }, t('health.pruneDangling').replace('{n}', String(dangling.length))) : null,
+                h('div', { style: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 } },
+                  report.slice(0, 30).map(issue => h('div', {
+                    key: issue.kind + '::' + issue.id,
+                    style: {
+                      display: 'flex', gap: 8, padding: '4px 8px', borderRadius: 6, fontSize: 12,
+                      background: 'var(--dsw-alias-bg-layer-2)',
+                      color: issue.kind === 'emptyTitle' ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-label-primary)',
+                    },
+                  },
+                    h('span', {
+                      style: {
+                        padding: '0 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                        background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-secondary)',
+                      },
+                    }, issue.kind),
+                    h('span', null, issue.text),
+                  )))),
+        ),
       );
     }
 
@@ -1646,6 +1741,7 @@ window.__ModuleLoader__.load({
           h('button', { onClick: () => actions.setView('workbench'), style: pill(view === 'workbench') }, t('tab.workbench')),
           h('button', { onClick: () => actions.setView('graph'), style: pill(view === 'graph') }, t('tab.graph')),
           h('button', { onClick: () => actions.setView('timeline'), style: pill(view === 'timeline') }, t('tab.timeline')),
+          h('button', { onClick: () => actions.setView('health'), style: pill(view === 'health') }, t('tab.health')),
           h('button', { onClick: () => actions.setView('portal'), style: pill(view === 'portal') }, t('tab.portal')),
         ),
 
@@ -1680,7 +1776,9 @@ window.__ModuleLoader__.load({
             ? h(GraphView, { entities, relations, actions, t })
             : view === 'timeline'
               ? h(TimelineView, { entities, actions, t })
-              : h('div', null,
+              : view === 'health'
+                ? h(HealthView, { entities, relations, actions, t })
+                : h('div', null,
             // 域页签（第一级）
             h('div', { style: { display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' } },
               DOMAINS.map(d => {
@@ -1860,6 +1958,7 @@ window.__ModuleLoader__.load({
       'tab.workbench': '工作台',
       'tab.graph': '图谱',
       'tab.timeline': '时间线',
+      'tab.health': '体检',
       'tab.portal': '门户',
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
       'graph.filter': '只看关系',
@@ -1887,6 +1986,12 @@ window.__ModuleLoader__.load({
       'batch.deleteConfirm': '确定删除所选 {n} 个实体及其全部关系？',
       'batch.merge': '合并到首个',
       'batch.mergeConfirm': '把后 {n0} 个实体合并进第一个（保留第一个）？字段取并集、关系改挂，操作不可撤销。',
+      'health.title': '完整性体检',
+      'health.run': '运行检查',
+      'health.hint': '校验悬挂关系、重复标题、空标题（对齐 worldsea-core ReferenceCheck 语义）。',
+      'health.clean': '检查通过：无问题。',
+      'health.summary': '悬挂关系 {d} · 重复标题 {dup} · 空标题 {e}',
+      'health.pruneDangling': '清理悬挂关系（{n}）',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -1943,6 +2048,7 @@ window.__ModuleLoader__.load({
       'tab.workbench': 'Workbench',
       'tab.graph': 'Graph',
       'tab.timeline': 'Timeline',
+      'tab.health': 'Health',
       'tab.portal': 'Portal',
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
       'graph.filter': 'Show relation',
@@ -1970,6 +2076,12 @@ window.__ModuleLoader__.load({
       'batch.deleteConfirm': 'Delete {n} selected entities and all their relations?',
       'batch.merge': 'Merge into first',
       'batch.mergeConfirm': 'Merge the other {n0} entities into the first (keep the first)? Fields union, relations re-attached; irreversible.',
+      'health.title': 'Integrity check',
+      'health.run': 'Run check',
+      'health.hint': 'Validates dangling relations, duplicate titles, empty titles (aligned with worldsea-core ReferenceCheck semantics).',
+      'health.clean': 'All clean.',
+      'health.summary': 'Dangling {d} · Duplicate titles {dup} · Empty titles {e}',
+      'health.pruneDangling': 'Prune dangling relations ({n})',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
