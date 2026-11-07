@@ -1414,7 +1414,7 @@ window.__ModuleLoader__.load({
         // 右列：正文编辑
         h('div', null,
           !selected
-            ? h(Card, { pad: 28 }, h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('writing.pick')))
+            ? h(EmptyState, null, t('writing.pick'))
             : h(Card, { pad: 14 },
               h('input', {
                 value: selected.title,
@@ -1555,7 +1555,7 @@ window.__ModuleLoader__.load({
         // 右列：章节编辑
         h('div', null,
           !selected
-            ? h(Card, { pad: 28 }, h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('ms.pick')))
+            ? h(EmptyState, null, t('ms.pick'))
             : h(Card, { pad: 14 },
               h('input', {
                 value: selected.title,
@@ -1653,7 +1653,7 @@ window.__ModuleLoader__.load({
           h(PrimaryButton, { small: true, onClick: exportMarkdown }, t('codex.export')),
         ),
         !active
-          ? h(Card, { pad: 28 }, h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('codex.empty')))
+          ? h(EmptyState, null, t('codex.empty'))
           : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } },
             active.groups.map(g => h(Card, { key: g.def.type, pad: 14 },
               h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 } },
@@ -1956,8 +1956,7 @@ window.__ModuleLoader__.load({
       const undated = entities.filter(e => !dated.some(d => d.entity.id === e.id));
 
       if (dated.length === 0) {
-        return h(Card, { pad: 28 },
-          h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('timeline.empty')));
+        return h(Card, { pad: DS.space.xxl }, h(EmptyState, null, t('timeline.empty')));
       }
 
       return h('div', null,
@@ -2601,35 +2600,25 @@ window.__ModuleLoader__.load({
                   }, t('batch.delete')),
                 ) : null,
                 list.length === 0
-                  ? h(Card, { pad: 28 }, h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('workbench.empty')))
-                  : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 } },
-                    list.map(e => h(Card, { key: e.id, pad: 12 },
-                      batchMode
-                        ? h('div', {
-                          onClick: () => actions.toggleBatchItem(e.id),
-                          style: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' },
-                        },
-                          h('input', {
-                            type: 'checkbox', checked: batchSelection.includes(e.id), readOnly: true,
-                            style: { accentColor: 'var(--dsw-alias-brand-primary)', cursor: 'pointer' },
-                          }),
-                          h('div', null,
-                            h('div', { style: { fontSize: 14, fontWeight: 600, marginBottom: 4 } }, e.title),
-                            h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: 8 } },
-                              h('span', null, e.updatedAt.slice(0, 10)),
-                              e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
-                            )),
-                        )
-                        : h('div', {
-                          onClick: () => actions.selectEntity(e.id),
-                          style: { cursor: 'pointer' },
-                        },
-                          h('div', { style: { fontSize: 14, fontWeight: 600, marginBottom: 4 } }, e.title),
-                          h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: 8 } },
+                  ? h(EmptyState, null, t('workbench.empty'))
+                  : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: DS.space.md } },
+                    list.map(e => h(Card, {
+                      key: e.id, pad: DS.space.md,
+                      active: batchMode && batchSelection.includes(e.id),
+                      onClick: () => batchMode ? actions.toggleBatchItem(e.id) : actions.selectEntity(e.id),
+                    },
+                      h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm } },
+                        batchMode ? h('input', {
+                          type: 'checkbox', checked: batchSelection.includes(e.id), readOnly: true,
+                          style: { accentColor: 'var(--dsw-alias-brand-primary)', cursor: 'pointer' },
+                        }) : null,
+                        h('div', { style: { flex: 1, minWidth: 0 } },
+                          h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600, marginBottom: DS.space.xs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, e.title),
+                          h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: DS.space.sm } },
                             h('span', null, e.updatedAt.slice(0, 10)),
                             e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
-                          ),
-                        ),
+                          )),
+                      ),
                     ))),
               ),
           ),
