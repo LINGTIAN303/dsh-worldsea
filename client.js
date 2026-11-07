@@ -805,39 +805,140 @@ window.__ModuleLoader__.load({
     });
 
     // ─────────────────────────────────────────────
-    // 通用 UI 原语（自绘，样式走主题 token）
+    // 设计系统 DS（统一常量 + 组件；全部走主题 token，明暗主题自适应）
     // ─────────────────────────────────────────────
 
-    /** 输入控件公共样式。 */
-    const inputStyle = {
-      width: '100%', boxSizing: 'border-box', padding: '6px 10px',
-      borderRadius: 6, border: '1px solid var(--dsw-alias-border-l1)',
-      background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)',
-      fontSize: 13, outline: 'none', fontFamily: 'inherit',
+    /**
+     * 设计常量：间距 / 字号 / 圆角 / 尺寸 / 动效。
+     * 约束：canvas 内无法用 CSS var，颜色常量单独放 GraphView.TYPE_COLORS。
+     */
+    const DS = {
+      space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 },
+      font: { xs: 11, sm: 12, md: 13, lg: 15, xl: 17, title: 21 },
+      radius: { sm: 6, md: 10, lg: 14, pill: 999 },
+      navWidth: 148,
+      /** 交互过渡（统一时长与缓动，克制不花哨）。 */
+      transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease',
+      /** 交互态背景（hover/active 统一取 token 组合）。 */
+      hoverBg: 'var(--dsw-alias-bg-layer-2)',
+      focusShadow: '0 0 0 2px var(--dsw-alias-brand-primary)',
     };
 
-    /** 次级按钮。 */
+    /** 控件基础态（focus 可见性 + 过渡；不参与布局）。 */
+    const dsControlBase = {
+      transition: DS.transition,
+      fontFamily: 'inherit',
+    };
+    const dsFocus = {
+      outline: 'none',
+      '::placeholder': { color: 'var(--dsw-alias-state-idle-primary)' },
+    };
+
+    /** 输入控件公共样式（select/textarea/input 共用）。 */
+    const inputStyle = {
+      ...dsControlBase,
+      width: '100%', boxSizing: 'border-box', padding: '6px 10px',
+      borderRadius: DS.radius.sm, border: '1px solid var(--dsw-alias-border-l1)',
+      background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)',
+      fontSize: DS.font.md, outline: 'none',
+    };
+
+    /** 次级按钮（描边；hover 提亮）。 */
     function GhostButton(props) {
       return h('button', {
         onClick: props.onClick,
         style: {
+          ...dsControlBase,
           padding: props.small ? '3px 10px' : '6px 14px',
-          borderRadius: 6, border: '1px solid var(--dsw-alias-border-l2)',
+          borderRadius: DS.radius.sm, border: '1px solid var(--dsw-alias-border-l2)',
           background: 'transparent', color: 'var(--dsw-alias-label-primary)',
-          fontSize: props.small ? 12 : 13, cursor: 'pointer',
+          fontSize: props.small ? DS.font.sm : DS.font.md, cursor: 'pointer',
         },
+        onMouseOver: e => { e.currentTarget.style.background = DS.hoverBg; },
+        onMouseOut: e => { e.currentTarget.style.background = 'transparent'; },
       }, props.children);
     }
 
-    /** 主按钮。 */
+    /** 主按钮（品牌底；hover 提亮一层）。 */
     function PrimaryButton(props) {
       return h('button', {
         onClick: props.onClick,
         style: {
+          ...dsControlBase,
           padding: props.small ? '3px 10px' : '6px 14px',
-          borderRadius: 6, border: 'none',
+          borderRadius: DS.radius.sm, border: 'none',
           background: 'var(--dsw-alias-brand-primary)', color: '#fff',
-          fontSize: props.small ? 12 : 13, fontWeight: 600, cursor: 'pointer',
+          fontSize: props.small ? DS.font.sm : DS.font.md, fontWeight: 600, cursor: 'pointer',
+        },
+        onMouseOver: e => { e.currentTarget.style.opacity = '0.88'; },
+        onMouseOut: e => { e.currentTarget.style.opacity = '1'; },
+      }, props.children);
+    }
+
+    /** 危险按钮（用于删除类动作；描边红字）。 */
+    function DangerButton(props) {
+      return h('button', {
+        onClick: props.onClick,
+        style: {
+          ...dsControlBase,
+          padding: props.small ? '3px 10px' : '6px 14px',
+          borderRadius: DS.radius.sm, border: '1px solid var(--dsw-alias-state-error-primary)',
+          background: 'transparent', color: 'var(--dsw-alias-state-error-primary)',
+          fontSize: props.small ? DS.font.sm : DS.font.md, cursor: 'pointer',
+        },
+        onMouseOver: e => { e.currentTarget.style.background = 'var(--dsw-alias-bg-layer-2)'; },
+        onMouseOut: e => { e.currentTarget.style.background = 'transparent'; },
+      }, props.children);
+    }
+
+    /** 卡片容器（层1 底 + 细边；可选可点击态）。 */
+    function Card(props) {
+      const clickable = props.onClick !== undefined;
+      return h('div', {
+        onClick: props.onClick,
+        style: {
+          ...dsControlBase,
+          background: 'var(--dsw-alias-bg-layer-1)',
+          border: '1px solid ' + (clickable && props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l1)'),
+          borderRadius: DS.radius.md, padding: props.pad || DS.space.lg,
+          ...(clickable ? { cursor: 'pointer' } : {}),
+        },
+        ...(clickable ? {
+          onMouseOver: e => { e.currentTarget.style.borderColor = props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l2)'; },
+          onMouseOut: e => { e.currentTarget.style.borderColor = props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l1)'; },
+        } : {}),
+      }, props.children);
+    }
+
+    /** 区块标题（小型节标题，带字距）。 */
+    function SectionTitle(props) {
+      return h('div', { style: { fontSize: DS.font.sm, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', letterSpacing: '0.04em', margin: '0 0 ' + DS.space.sm + 'px' } }, props.children);
+    }
+
+    /** 空状态（居中弱文本；可选动作）。 */
+    function EmptyState(props) {
+      return h('div', {
+        style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: DS.font.md, padding: DS.space.xxl, lineHeight: 1.8 },
+      }, props.children, props.action || null);
+    }
+
+    /** 字段包装（label 上、控件下的表单行）。 */
+    function Field(props) {
+      return h('div', { style: { marginBottom: DS.space.md } },
+        h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: DS.space.xs } }, props.label),
+        props.children,
+      );
+    }
+
+    /** 徽标 chip（只读小标签）。 */
+    function Chip(props) {
+      return h('span', {
+        style: {
+          display: 'inline-flex', alignItems: 'center', gap: DS.space.xs,
+          padding: '2px 8px', borderRadius: DS.radius.pill, fontSize: DS.font.sm,
+          background: props.tone === 'brand' ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-2)',
+          color: props.tone === 'brand' ? '#fff' : 'var(--dsw-alias-label-secondary)',
+          border: props.tone === 'brand' ? 'none' : '1px solid var(--dsw-alias-border-l1)',
         },
       }, props.children);
     }
@@ -952,17 +1053,6 @@ window.__ModuleLoader__.load({
         default:
           return h('svg', common, h('circle', { cx: 12, cy: 12, r: 8 }));
       }
-    }
-
-    /** 卡片容器。 */
-    function Card(props) {
-      return h('div', {
-        style: {
-          background: 'var(--dsw-alias-bg-layer-1)',
-          border: '1px solid var(--dsw-alias-border-l1)',
-          borderRadius: 10, padding: props.pad || 16,
-        },
-      }, props.children);
     }
 
     // ─────────────────────────────────────────────
