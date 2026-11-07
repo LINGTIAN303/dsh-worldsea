@@ -1105,7 +1105,7 @@ window.__ModuleLoader__.load({
 
       return h(Card, { pad: 14 },
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 } },
-          h('div', { style: { fontSize: 14, fontWeight: 600 } }, t('relations.title')),
+          h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600 } }, t('relations.title')),
           h('div', { style: { flex: 1 } }),
           h('select', { value: relType, onChange: e => setRelType(e.target.value), style: { ...inputStyle, width: 'auto' } },
             allDefs.map(r => h('option', { key: r.type, value: r.type }, r.label + (r.isCustom ? ' ★' : '')))),
@@ -1131,8 +1131,8 @@ window.__ModuleLoader__.load({
         // 自定义关系类型面板。
         showCustom ? h('div', {
           style: {
-            marginBottom: 10, padding: 10, borderRadius: 8,
-            background: 'var(--dsw-alias-bg-layer-2)', fontSize: 12,
+            marginBottom: 10, padding: 10, borderRadius: DS.radius.md,
+            background: 'var(--dsw-alias-bg-layer-2)', fontSize: DS.font.sm,
           },
         },
           h('div', { style: { fontWeight: 600, marginBottom: 6 } }, t('relations.customTitle')),
@@ -1159,23 +1159,23 @@ window.__ModuleLoader__.load({
               key: r.type,
               style: {
                 display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px',
-                borderRadius: 999, background: 'var(--dsw-alias-bg-layer-1)',
+                borderRadius: DS.radius.pill, background: 'var(--dsw-alias-bg-layer-1)',
                 border: '1px solid var(--dsw-alias-border-l1)',
               },
             },
               r.label + '（' + r.type + (r.symmetric ? ' ⇄ 自身' : ' ⇄ ' + r.inverseType) + '）',
               h('button', {
                 onClick: () => actions.removeCustomRelationType(r.type),
-                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-state-error-primary)', padding: 0, fontSize: 11 },
+                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-state-error-primary)', padding: 0, fontSize: DS.font.xs },
               }, '×'),
             ))) : null,
         ) : null,
         rows.length === 0
-          ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('relations.empty'))
+          ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('relations.empty'))
           : h('div', null, rows.map(row => h(RelationRow, {
             key: row.id, row, actions, t,
           }))),
-        h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)', marginTop: 8 } }, t('relations.hint')),
+        h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', marginTop: 8 } }, t('relations.hint')),
       );
     }
 
@@ -1188,20 +1188,20 @@ window.__ModuleLoader__.load({
         h('div', {
           style: {
             display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px',
-            fontSize: 13, borderRadius: 6, marginBottom: 2,
+            fontSize: DS.font.md, borderRadius: DS.radius.sm, marginBottom: 2,
             background: 'var(--dsw-alias-bg-layer-2)',
           },
         },
           h('span', { style: { flex: 1 } }, row.text),
-          note ? h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, '📝 ' + note.slice(0, 16)) : null,
+          note ? h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, '📝 ' + note.slice(0, 16)) : null,
           h('button', {
             onClick: () => setOpen(!open),
-            style: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--dsw-alias-brand-primary)' },
+            style: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: DS.font.sm, color: 'var(--dsw-alias-brand-primary)' },
           }, open ? '▾' : t('relations.editProps')),
           h('button', {
             onClick: () => actions.removeRelation(row.id),
             style: {
-              border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12,
+              border: 'none', background: 'transparent', cursor: 'pointer', fontSize: DS.font.sm,
               color: 'var(--dsw-alias-state-error-primary)',
             },
           }, t('relations.remove')),
@@ -1211,7 +1211,7 @@ window.__ModuleLoader__.load({
             value: note,
             placeholder: t('relations.notePlaceholder'),
             onChange: e => actions.setRelationNote(row.id, e.target.value),
-            style: { ...inputStyle, flex: 1, padding: '4px 8px', fontSize: 12 },
+            style: { ...inputStyle, flex: 1, padding: '4px 8px', fontSize: DS.font.sm },
           }),
         ) : null,
       );
@@ -1226,7 +1226,7 @@ window.__ModuleLoader__.load({
           key: tag,
           style: {
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '2px 8px', borderRadius: 999, fontSize: 12,
+            padding: '2px 8px', borderRadius: DS.radius.pill, fontSize: DS.font.sm,
             background: 'var(--dsw-alias-bg-layer-2)',
             border: '1px solid var(--dsw-alias-border-l1)',
           },
@@ -1234,7 +1234,7 @@ window.__ModuleLoader__.load({
           tag,
           h('button', {
             onClick: () => actions.removeTag(entity.id, tag),
-            style: { border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: 11 },
+            style: { border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: DS.font.xs },
           }, '×'),
         )),
         h('input', {
@@ -1247,7 +1247,7 @@ window.__ModuleLoader__.load({
               setText('');
             }
           },
-          style: { ...inputStyle, width: 120, padding: '2px 8px', fontSize: 12 },
+          style: { ...inputStyle, width: 120, padding: '2px 8px', fontSize: DS.font.sm },
         }),
       );
     }
@@ -1303,7 +1303,7 @@ window.__ModuleLoader__.load({
       const { entities, actions, t } = props;
       /** 本视图自己的页签样式（与 Workbench.pill 同款）。 */
       const pill = (active) => ({
-        padding: '5px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 13,
+        padding: '5px 14px', borderRadius: DS.radius.pill, border: 'none', cursor: 'pointer', fontSize: DS.font.md,
         background: active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-1)',
         color: active ? '#fff' : 'var(--dsw-alias-label-primary)',
       });
@@ -1367,35 +1367,35 @@ window.__ModuleLoader__.load({
           h(Card, { pad: 8 },
             tab === 'outline'
               ? (outlineRows.length === 0
-                ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', padding: 8 } }, t('writing.emptyOutline'))
+                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', padding: 8 } }, t('writing.emptyOutline'))
                 : outlineRows.map(({ node, depth }) => h('div', {
                   key: node.id,
                   onClick: () => setSelectedId(node.id),
                   style: {
                     ...indentStyle(depth),
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                    padding: '5px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md,
                     marginBottom: 2,
                     background: selectedId === node.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
                     fontWeight: depth === 0 ? 600 : 400,
                   },
                 },
-                  h('span', { style: { fontSize: 10, color: 'var(--dsw-alias-label-secondary)' } },
+                  h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
                     node.properties.condition || ''),
                   h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, node.title),
                 )))
               : (notes.length === 0
-                ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', padding: 8 } }, t('writing.emptyNotes'))
+                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', padding: 8 } }, t('writing.emptyNotes'))
                 : notes.map(n => h('div', {
                   key: n.id,
                   onClick: () => setSelectedId(n.id),
                   style: {
-                    padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginBottom: 2,
+                    padding: '5px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md, marginBottom: 2,
                     background: selectedId === n.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
                   },
                 },
                   h('div', { style: { fontWeight: 600 } }, n.title),
-                  h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
+                  h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
                     n.properties.noteType + ' · ' + ((n.properties.content || '').length) + ' 字'),
                 ))),
             h('div', { style: { padding: '6px 4px 2px', display: 'flex', gap: 6 } },
@@ -1419,7 +1419,7 @@ window.__ModuleLoader__.load({
               h('input', {
                 value: selected.title,
                 onChange: e => actions.renameEntity(selected.id, e.target.value),
-                style: { ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 8 },
+                style: { ...inputStyle, fontSize: DS.font.xl, fontWeight: 600, marginBottom: 8 },
               }),
               tab === 'outline' ? h('div', { style: { display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' } },
                 h('select', {
@@ -1449,7 +1449,7 @@ window.__ModuleLoader__.load({
                 placeholder: t('writing.contentPlaceholder'),
                 style: { ...inputStyle, fontFamily: 'ui-monospace, monospace', lineHeight: 1.7, resize: 'vertical' },
               }),
-              h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
+              h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
                 t('writing.charCount').replace('{n}', String((selected.properties.content || '').length))),
             )),
       );
@@ -1502,7 +1502,7 @@ window.__ModuleLoader__.load({
         h('div', null,
           h(Card, { pad: 8 },
             h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 4px 8px' } },
-              h('div', { style: { fontSize: 13, fontWeight: 600, flex: 1 } }, t('ms.books') + ' (' + books.length + ')'),
+              h('div', { style: { fontSize: DS.font.md, fontWeight: 600, flex: 1 } }, t('ms.books') + ' (' + books.length + ')'),
               h(PrimaryButton, { small: true, onClick: () => actions.create('book', t('ms.newBook')) }, t('ms.newBook')),
             ),
             books.map(b => h('div', { key: b.id, style: { marginBottom: 10 } },
@@ -1511,11 +1511,11 @@ window.__ModuleLoader__.load({
                 h('span', { style: { fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, b.title),
                 h('button', {
                   onClick: () => exportBook(b),
-                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: 12 },
+                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: DS.font.sm },
                 }, t('ms.exportBook')),
                 h('button', {
                   onClick: () => newChapter(b.id),
-                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: 12 },
+                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: DS.font.sm },
                 }, '＋' + t('ms.chapter')),
               ),
               chapterRows(b.id).map(c => h('div', {
@@ -1523,26 +1523,26 @@ window.__ModuleLoader__.load({
                 onClick: () => setSelectedId(c.id),
                 style: {
                   display: 'flex', alignItems: 'center', gap: 6,
-                  marginLeft: 16, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginBottom: 2,
+                  marginLeft: 16, padding: '4px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md, marginBottom: 2,
                   background: selectedId === c.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
                 },
               },
                 h('span', {
-                  style: { fontSize: 10, color: 'var(--dsw-alias-label-secondary)', width: 30 },
+                  style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', width: 30 },
                 }, c.properties.condition || ''),
                 h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, c.title),
-                h('span', { style: { fontSize: 10, color: 'var(--dsw-alias-label-secondary)' } }, (c.properties.content || '').length),
+                h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, (c.properties.content || '').length),
               )),
             )),
             // 未归书章节
             chapterRows('').length ? h('div', null,
-              h('div', { style: { padding: '4px 6px', fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('ms.orphaned') + ' (' + chapterRows('').length + ')'),
+              h('div', { style: { padding: '4px 6px', fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('ms.orphaned') + ' (' + chapterRows('').length + ')'),
               chapterRows('').map(c => h('div', {
                 key: c.id,
                 onClick: () => setSelectedId(c.id),
                 style: {
                   display: 'flex', alignItems: 'center', gap: 6,
-                  marginLeft: 16, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginBottom: 2,
+                  marginLeft: 16, padding: '4px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md, marginBottom: 2,
                   background: selectedId === c.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
                 },
               }, h('span', { style: { flex: 1 } }, c.title))),
@@ -1560,7 +1560,7 @@ window.__ModuleLoader__.load({
               h('input', {
                 value: selected.title,
                 onChange: e => actions.renameEntity(selected.id, e.target.value),
-                style: { ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 8 },
+                style: { ...inputStyle, fontSize: DS.font.xl, fontWeight: 600, marginBottom: 8 },
               }),
               h('div', { style: { display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' } },
                 h('select', {
@@ -1583,7 +1583,7 @@ window.__ModuleLoader__.load({
                   style: { ...inputStyle, width: 130 },
                 }),
                 h('div', { style: { flex: 1 } }),
-                h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, t('writing.charCount').replace('{n}', String(contentLen))),
+                h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, t('writing.charCount').replace('{n}', String(contentLen))),
               ),
               h('textarea', {
                 value: selected.properties.content || '',
@@ -1645,7 +1645,7 @@ window.__ModuleLoader__.load({
           h('select', {
             value: active ? active.domain.id : '',
             onChange: e => setChapter(e.target.value),
-            style: { ...inputStyle, width: 'auto', padding: '4px 10px', fontSize: 13 },
+            style: { ...inputStyle, width: 'auto', padding: '4px 10px', fontSize: DS.font.md },
           },
             chapters.map(c => h('option', { key: c.domain.id, value: c.domain.id },
               c.domain.label + '（' + c.groups.reduce((n, g) => n + g.items.length, 0) + '）'))),
@@ -1658,13 +1658,13 @@ window.__ModuleLoader__.load({
             active.groups.map(g => h(Card, { key: g.def.type, pad: 14 },
               h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 } },
                 h(TypeGlyph, { glyph: g.def.glyph, size: 15 }),
-                h('div', { style: { fontSize: 15, fontWeight: 700 } }, g.def.label),
-                h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, '× ' + g.items.length),
+                h('div', { style: { fontSize: DS.font.lg, fontWeight: 700 } }, g.def.label),
+                h('span', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, '× ' + g.items.length),
               ),
               g.items.map(e => h('div', { key: e.id, style: { padding: '8px 0', borderTop: '1px solid var(--dsw-alias-border-l1)' } },
-                h('div', { style: { fontSize: 14, fontWeight: 600 } }, e.title),
-                e.description ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginTop: 2, whiteSpace: 'pre-wrap' } }, e.description.slice(0, 120)) : null,
-                e.tags.length ? h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-brand-primary)', marginTop: 2 } }, e.tags.join(' · ')) : null,
+                h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600 } }, e.title),
+                e.description ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginTop: 2, whiteSpace: 'pre-wrap' } }, e.description.slice(0, 120)) : null,
+                e.tags.length ? h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-brand-primary)', marginTop: 2 } }, e.tags.join(' · ')) : null,
               )),
             ))),
       );
@@ -1679,16 +1679,16 @@ window.__ModuleLoader__.load({
       return h('div', null,
         h(Card, { pad: 14 },
           h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 } },
-            h('div', { style: { fontSize: 14, fontWeight: 600 } }, t('health.title')),
+            h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600 } }, t('health.title')),
             h('div', { style: { flex: 1 } }),
             h(PrimaryButton, { small: true, onClick: run }, t('health.run')),
           ),
           !report
-            ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('health.hint'))
+            ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('health.hint'))
             : report.length === 0
-              ? h('div', { style: { fontSize: 13, color: 'var(--dsw-alias-state-success-primary)' } }, t('health.clean'))
+              ? h('div', { style: { fontSize: DS.font.md, color: 'var(--dsw-alias-state-success-primary)' } }, t('health.clean'))
               : h('div', null,
-                h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginBottom: 8 } },
+                h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 8 } },
                   t('health.summary')
                     .replace('{d}', String(dangling.length))
                     .replace('{dup}', String(report.filter(i => i.kind === 'duplicateTitle').length))
@@ -1701,14 +1701,14 @@ window.__ModuleLoader__.load({
                   report.slice(0, 30).map(issue => h('div', {
                     key: issue.kind + '::' + issue.id,
                     style: {
-                      display: 'flex', gap: 8, padding: '4px 8px', borderRadius: 6, fontSize: 12,
+                      display: 'flex', gap: 8, padding: '4px 8px', borderRadius: DS.radius.sm, fontSize: DS.font.sm,
                       background: 'var(--dsw-alias-bg-layer-2)',
                       color: issue.kind === 'emptyTitle' ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-label-primary)',
                     },
                   },
                     h('span', {
                       style: {
-                        padding: '0 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                        padding: '0 6px', borderRadius: DS.radius.sm, fontSize: DS.font.xs, fontWeight: 600,
                         background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-secondary)',
                       },
                     }, issue.kind),
@@ -1893,11 +1893,11 @@ window.__ModuleLoader__.load({
       return h('div', { style: { position: 'relative' } },
         // 边筛选条。
         h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' } },
-          h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('graph.filter')),
+          h('span', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('graph.filter')),
           h('select', {
             value: edgeFilter,
             onChange: e => setEdgeFilter(e.target.value),
-            style: { ...inputStyle, width: 'auto', padding: '3px 8px', fontSize: 12 },
+            style: { ...inputStyle, width: 'auto', padding: '3px 8px', fontSize: DS.font.sm },
           },
             h('option', { value: '' }, t('graph.allRelations')),
             usedLabels.map(label => h('option', { key: label, value: label }, label))),
@@ -1905,7 +1905,7 @@ window.__ModuleLoader__.load({
         h('canvas', {
           ref: canvasRef,
           style: {
-            borderRadius: 10, border: '1px solid var(--dsw-alias-border-l1)',
+            borderRadius: DS.radius.md, border: '1px solid var(--dsw-alias-border-l1)',
             background: 'var(--dsw-alias-bg-layer-1)', display: 'block', cursor: 'grab',
           },
           onMouseDown: e => { const n = pick(e); if (n) dragRef.current = n; },
@@ -1926,13 +1926,13 @@ window.__ModuleLoader__.load({
           onMouseLeave: () => { dragRef.current = null; hoverRef.current = null; },
         }),
         // 图例。
-        h('div', { style: { display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } },
+        h('div', { style: { display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } },
           Object.keys(TYPE_COLORS).map(type => h('span', { key: type, style: { display: 'inline-flex', alignItems: 'center', gap: 4 } },
             h('span', { style: { width: 8, height: 8, borderRadius: 99, background: TYPE_COLORS[type], display: 'inline-block' } }),
             ENTITY_TYPES.find(x => x.type === type)?.label || type,
           ))),
         entities.length === 0
-          ? h('div', { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--dsw-alias-label-secondary)' } }, t('graph.empty'))
+          ? h('div', { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: DS.font.md, color: 'var(--dsw-alias-label-secondary)' } }, t('graph.empty'))
           : null,
       );
     }
@@ -1961,7 +1961,7 @@ window.__ModuleLoader__.load({
 
       return h('div', null,
         h(Card, { pad: 14 },
-          h('div', { style: { fontSize: 14, fontWeight: 600, marginBottom: 10 } }, t('timeline.title') + ' · ' + dated.length),
+          h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600, marginBottom: 10 } }, t('timeline.title') + ' · ' + dated.length),
           h('div', { style: { position: 'relative', paddingLeft: 18 } },
             // 纵向主轴。
             h('div', {
@@ -1982,23 +1982,23 @@ window.__ModuleLoader__.load({
               h('div', {
                 onClick: () => { actions.selectEntity(entity.id); actions.setView('workbench'); },
                 style: {
-                  display: 'inline-block', padding: '5px 12px', borderRadius: 8, cursor: 'pointer',
+                  display: 'inline-block', padding: '5px 12px', borderRadius: DS.radius.md, cursor: 'pointer',
                   background: 'var(--dsw-alias-bg-layer-1)', border: '1px solid var(--dsw-alias-border-l1)',
                 },
               },
                 h('div', { style: { display: 'flex', gap: 8, alignItems: 'baseline' } },
                   h('span', {
                     style: {
-                      fontSize: 12, fontFamily: 'ui-monospace, monospace',
+                      fontSize: DS.font.sm, fontFamily: 'ui-monospace, monospace',
                       color: 'var(--dsw-alias-brand-primary)', fontWeight: 600,
                     },
                   }, date + (dateEnd ? ' → ' + dateEnd : '')),
-                  h('span', { style: { fontSize: 14, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' } }, entity.title),
-                  h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
+                  h('span', { style: { fontSize: DS.font.md + 1, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' } }, entity.title),
+                  h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
                     ENTITY_TYPES.find(x => x.type === entity.type)?.label || entity.type),
                 ),
                 entity.description
-                  ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginTop: 2 } },
+                  ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginTop: 2 } },
                     entity.description.slice(0, 80) + (entity.description.length > 80 ? '…' : ''))
                   : null,
               ),
@@ -2006,14 +2006,14 @@ window.__ModuleLoader__.load({
         ),
         undated.length ? h('div', { style: { marginTop: 12 } },
           h(Card, { pad: 14 },
-            h('div', { style: { fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--dsw-alias-label-secondary)' } },
+            h('div', { style: { fontSize: DS.font.md, fontWeight: 600, marginBottom: 8, color: 'var(--dsw-alias-label-secondary)' } },
               t('timeline.undated') + ' · ' + undated.length),
             h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
               undated.slice(0, 30).map(e => h('span', {
                 key: e.id,
                 onClick: () => { actions.selectEntity(e.id); actions.setView('workbench'); },
                 style: {
-                  padding: '3px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
+                  padding: '3px 10px', borderRadius: DS.radius.pill, fontSize: DS.font.sm, cursor: 'pointer',
                   background: 'var(--dsw-alias-bg-layer-1)', border: '1px solid var(--dsw-alias-border-l1)',
                   color: 'var(--dsw-alias-label-secondary)',
                 },
@@ -2026,7 +2026,7 @@ window.__ModuleLoader__.load({
       const { field, value, editing, onChange } = props;
       if (!editing) {
         if (value === undefined || value === '') return null;
-        return h('div', { style: { display: 'flex', gap: 12, padding: '5px 0', fontSize: 13 } },
+        return h('div', { style: { display: 'flex', gap: 12, padding: '5px 0', fontSize: DS.font.md } },
           h('span', { style: { width: 90, flexShrink: 0, color: 'var(--dsw-alias-label-secondary)' } }, field.label),
           h('span', { style: { color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap' } }, String(value)),
         );
@@ -2062,7 +2062,7 @@ window.__ModuleLoader__.load({
         });
       }
       return h('div', { style: { marginBottom: 10 } },
-        h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, field.label),
+        h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, field.label),
         control,
       );
     }
@@ -2077,16 +2077,16 @@ window.__ModuleLoader__.load({
           onClick: () => setOpen(!open),
           style: {
             display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer',
-            borderRadius: 8, background: 'var(--dsw-alias-bg-layer-2)', fontSize: 13,
+            borderRadius: DS.radius.md, background: 'var(--dsw-alias-bg-layer-2)', fontSize: DS.font.md,
           },
         },
           h(TypeGlyph, { glyph: group.glyph, size: 13 }),
           h('span', { style: { fontWeight: 600 } }, group.label),
           filled ? h('span', {
-            style: { fontSize: 11, color: 'var(--dsw-alias-state-success-primary)' },
+            style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-state-success-primary)' },
           }, t('facet.filled')) : null,
           h('span', { style: { flex: 1 } }),
-          h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, open ? '▾' : '▸'),
+          h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, open ? '▾' : '▸'),
         ),
         open ? h(Card, { pad: 12 },
           group.fields.map(f => h(FieldRow, {
@@ -2116,12 +2116,12 @@ window.__ModuleLoader__.load({
             }, t('detail.delete')),
           ),
           h(Card, null,
-            h('div', { style: { fontSize: 17, fontWeight: 600, marginBottom: 2 } }, entity.title),
-            h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginBottom: 10 } },
+            h('div', { style: { fontSize: DS.font.xl, fontWeight: 600, marginBottom: 2 } }, entity.title),
+            h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 10 } },
               entity.updatedAt.slice(0, 10) + ' · ' + entity.id),
             h(TagsSection, { entity, actions, t }),
             entity.description
-              ? h('div', { style: { fontSize: 13, marginBottom: 10, lineHeight: 1.6, whiteSpace: 'pre-wrap' } }, entity.description)
+              ? h('div', { style: { fontSize: DS.font.md, marginBottom: 10, lineHeight: 1.6, whiteSpace: 'pre-wrap' } }, entity.description)
               : null,
             fields.map(f => h(FieldRow, {
               key: f.key, field: f, value: entity.properties[f.key], editing: false,
@@ -2144,12 +2144,12 @@ window.__ModuleLoader__.load({
           h(PrimaryButton, { small: true, onClick: () => actions.commitEdit() }, t('detail.save')),
         ),
         h(Card, null,
-          h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, t('detail.titleLabel')),
+          h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, t('detail.titleLabel')),
           h('input', {
             value: draft.title, onChange: e => actions.editDraft({ title: e.target.value }),
             style: { ...inputStyle, marginBottom: 10 },
           }),
-          h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, t('detail.descLabel')),
+          h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, t('detail.descLabel')),
           h('textarea', {
             value: draft.description, rows: 2,
             onChange: e => actions.editDraft({ description: e.target.value }),
@@ -2219,7 +2219,7 @@ window.__ModuleLoader__.load({
 
       return h(Card, { pad: 14 },
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' } },
-          h('div', { style: { fontSize: 14, fontWeight: 600 } }, t('data.title')),
+          h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600 } }, t('data.title')),
           h('div', { style: { flex: 1 } }),
           h(GhostButton, { small: true, onClick: exportJson }, t('data.export')),
           h(GhostButton, { small: true, onClick: () => fileRef.current && fileRef.current.click() }, t('data.import')),
@@ -2233,12 +2233,12 @@ window.__ModuleLoader__.load({
             onChange: e => { const f = e.target.files && e.target.files[0]; if (f) importJson(f); e.target.value = ''; },
           }),
         ),
-        snapshot ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
+        snapshot ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
           t('data.counts').replace('{e}', String(snapshot.entities.length)).replace('{r}', String(snapshot.relations.length))
           + (usage !== null ? ' · ' + t('data.usage').replace('{kb}', String(Math.round(usage / 1024))) : '')) : null,
-        snapshot && stale && snapshot.entities.length > 0 ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-state-warn-primary)', marginTop: 4 } },
+        snapshot && stale && snapshot.entities.length > 0 ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-state-warn-primary)', marginTop: 4 } },
           t('data.staleReminder')) : null,
-        notice ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-state-success-primary)', marginTop: 4 } }, notice) : null,
+        notice ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-state-success-primary)', marginTop: 4 } }, notice) : null,
       );
     }
 
@@ -2260,23 +2260,23 @@ window.__ModuleLoader__.load({
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 } },
           WorldIcon({ size: 36 }),
           h('div', null,
-            h('div', { style: { fontSize: 17, fontWeight: 600 } }, 'WorldSea'),
-            h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('tagline')),
+            h('div', { style: { fontSize: DS.font.xl, fontWeight: 600 } }, 'WorldSea'),
+            h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('tagline')),
           ),
         ),
-        h('p', { style: { fontSize: 13, lineHeight: 1.7, color: 'var(--dsw-alias-label-secondary)', margin: '0 0 16px' } }, t('intro')),
+        h('p', { style: { fontSize: DS.font.md, lineHeight: 1.7, color: 'var(--dsw-alias-label-secondary)', margin: '0 0 16px' } }, t('intro')),
         h(Card, { pad: 14 },
           LINKS.map(link => h('a', {
             key: link.id, href: link.href, target: '_blank', rel: 'noreferrer',
             style: {
-              display: 'block', padding: '6px 10px', borderRadius: 6, marginBottom: 4,
-              fontSize: 13, color: 'var(--dsw-alias-brand-primary)', textDecoration: 'none',
+              display: 'block', padding: '6px 10px', borderRadius: DS.radius.sm, marginBottom: 4,
+              fontSize: DS.font.md, color: 'var(--dsw-alias-brand-primary)', textDecoration: 'none',
               background: 'var(--dsw-alias-bg-layer-1)',
             },
           }, t('links.' + link.id) + ' — ' + link.href.replace('https://', ''))),
           h('div', { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 } },
             h(PrimaryButton, { onClick: launchDesktop }, t('launch.button')),
-            h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('launch.hint')),
+            h('span', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('launch.hint')),
           ),
         ),
       );
@@ -2300,13 +2300,13 @@ window.__ModuleLoader__.load({
         h('button', {
           onClick: () => setOpen(!open),
           style: {
-            padding: '3px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12,
+            padding: '3px 12px', borderRadius: DS.radius.pill, cursor: 'pointer', fontSize: DS.font.sm,
             border: '1px dashed var(--dsw-alias-border-l2)', background: 'transparent',
             color: 'var(--dsw-alias-label-secondary)',
           },
         }, open ? t('customType.close') : t('customType.open')),
         open ? h(Card, { pad: 12 },
-          h('div', { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, t('customType.title')),
+          h('div', { style: { fontSize: DS.font.md, fontWeight: 600, marginBottom: 8 } }, t('customType.title')),
           h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 } },
             h('input', { value: type, placeholder: t('customType.key'), onChange: e => setType(e.target.value), style: { ...inputStyle, width: 120 } }),
             h('input', { value: label, placeholder: t('customType.label'), onChange: e => setLabel(e.target.value), style: { ...inputStyle, width: 100 } }),
@@ -2325,21 +2325,21 @@ window.__ModuleLoader__.load({
             placeholder: t('customType.fieldsHint'),
             rows: 3,
             onChange: e => setFieldLines(e.target.value),
-            style: { ...inputStyle, marginBottom: 8, fontSize: 12, fontFamily: 'ui-monospace, monospace' },
+            style: { ...inputStyle, marginBottom: 8, fontSize: DS.font.sm, fontFamily: 'ui-monospace, monospace' },
           }),
           customEntityTypes.length ? h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
             customEntityTypes.map(ct => h('span', {
               key: ct.type,
               style: {
                 display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px',
-                borderRadius: 999, fontSize: 12, background: 'var(--dsw-alias-bg-layer-2)',
+                borderRadius: DS.radius.pill, fontSize: DS.font.sm, background: 'var(--dsw-alias-bg-layer-2)',
                 border: '1px solid var(--dsw-alias-border-l1)',
               },
             },
               ct.label + '（' + ct.type + ' · ' + entities.filter(e => e.type === ct.type).length + '）',
               h('button', {
                 onClick: () => { if (window.confirm(t('customType.removeConfirm').replace('{label}', ct.label))) actions.removeCustomEntityType(ct.type); },
-                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-state-error-primary)', padding: 0, fontSize: 11 },
+                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-state-error-primary)', padding: 0, fontSize: DS.font.xs },
               }, '×'),
             ))) : null,
         ) : null,
@@ -2494,23 +2494,23 @@ window.__ModuleLoader__.load({
         view === 'workbench' && kw && !selected
           ? h('div', { style: { marginBottom: 14 } },
             h(Card, { pad: 12 },
-              h('div', { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } },
+              h('div', { style: { fontSize: DS.font.md, fontWeight: 600, marginBottom: 8 } },
                 t('search.globalTitle') + ' · ' + globalHits.length),
               globalHits.length === 0
-                ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('search.noHits'))
+                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('search.noHits'))
                 : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
                   globalHits.slice(0, 12).map(({ entity: e, where }) => h('div', {
                     key: e.id,
                     onClick: () => { actions.selectType(e.type); actions.selectEntity(e.id); },
                     style: {
                       display: 'flex', gap: 8, alignItems: 'center', padding: '4px 8px',
-                      borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                      borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md,
                       background: 'var(--dsw-alias-bg-layer-2)',
                     },
                   },
                     h(TypeGlyph, { glyph: allTypes.find(x => x.type === e.type)?.glyph, size: 12 }),
                     h('span', { style: { fontWeight: 600 } }, e.title),
-                    h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
+                    h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
                       (allTypes.find(x => x.type === e.type)?.label || e.type) + ' · ' + where),
                   )))))
           : null,
@@ -2536,7 +2536,7 @@ window.__ModuleLoader__.load({
                   key: d.id,
                   onClick: () => actions.selectDomain(d.id),
                   style: {
-                    padding: '3px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12,
+                    padding: '3px 12px', borderRadius: DS.radius.pill, cursor: 'pointer', fontSize: DS.font.sm,
                     border: 'none',
                     background: d.id === domain ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-1)',
                     color: d.id === domain ? '#fff' : 'var(--dsw-alias-label-primary)',
@@ -2552,7 +2552,7 @@ window.__ModuleLoader__.load({
                 onClick: () => actions.selectType(def.type),
                 style: {
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '4px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12,
+                  padding: '4px 12px', borderRadius: DS.radius.pill, cursor: 'pointer', fontSize: DS.font.sm,
                   border: '1px solid ' + (def.type === activeType ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l1)'),
                   background: def.type === activeType ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
                   color: 'var(--dsw-alias-label-primary)',
@@ -2569,12 +2569,12 @@ window.__ModuleLoader__.load({
               ? h(EntityDetail, { useStore, actions, entity: selected, fields: typeDef.fields, allRelations: relations, allEntities: entities, customRelationTypes, t, onBack: () => actions.selectEntity(null) })
               : h('div', null,
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 } },
-                  h('h3', { style: { margin: 0, fontSize: 15 } }, typeDef.label + ' · ' + t('workbench.list')),
+                  h('h3', { style: { margin: 0, fontSize: DS.font.lg } }, typeDef.label + ' · ' + t('workbench.list')),
                   h('input', {
                     value: search,
                     placeholder: t('workbench.searchPlaceholder'),
                     onChange: e => actions.setSearch(e.target.value),
-                    style: { ...inputStyle, width: 180, padding: '4px 10px', fontSize: 12 },
+                    style: { ...inputStyle, width: 180, padding: '4px 10px', fontSize: DS.font.sm },
                   }),
                   h('div', { style: { flex: 1 } }),
                   h(GhostButton, { small: true, onClick: () => actions.toggleBatchMode() }, batchMode ? t('batch.exit') : t('batch.enter')),
@@ -2585,8 +2585,8 @@ window.__ModuleLoader__.load({
                 batchMode ? h('div', {
                   style: {
                     display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-                    padding: '7px 12px', borderRadius: 8, flexWrap: 'wrap',
-                    background: 'var(--dsw-alias-bg-layer-2)', fontSize: 13,
+                    padding: '7px 12px', borderRadius: DS.radius.md, flexWrap: 'wrap',
+                    background: 'var(--dsw-alias-bg-layer-2)', fontSize: DS.font.md,
                   },
                 },
                   h('span', { style: { fontWeight: 600 } }, t('batch.selected').replace('{n}', String(batchSelection.length))),
@@ -2599,7 +2599,7 @@ window.__ModuleLoader__.load({
                         e.currentTarget.value = '';
                       }
                     },
-                    style: { ...inputStyle, width: 150, padding: '4px 8px', fontSize: 12 },
+                    style: { ...inputStyle, width: 150, padding: '4px 8px', fontSize: DS.font.sm },
                   }),
                   h(GhostButton, { small: true, onClick: () => { const el = batchTagRef.current; if (el && el.value.trim()) { actions.batchAddTag(el.value); el.value = ''; } } }, t('batch.applyTag')),
                   h(GhostButton, {
