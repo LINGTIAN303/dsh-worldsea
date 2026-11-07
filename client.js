@@ -2408,11 +2408,12 @@ window.__ModuleLoader__.load({
         { id: 'maintain', label: t('nav.maintain'), items: ['health', 'portal'] },
       ];
       const NAV_GLYPHS = { workbench: 'grid', writing: 'note', manuscript: 'manuscript', graph: 'graph', timeline: 'clock', codex: 'book', health: 'shield', portal: 'globe' };
-      /** 导航行（图标 + 文字，选中态品牌左条）。 */
+      /** 导航行（图标 + 文字；窄模式只留图标，文字由 CSS 隐藏）。 */
       const navRow = (id) => {
         const active = view === id;
         return h('div', {
           key: id,
+          className: 'ws-nav-row',
           onClick: () => actions.setView(id),
           style: {
             ...dsControlBase,
@@ -2427,15 +2428,30 @@ window.__ModuleLoader__.load({
           onMouseOut: e => { if (!active) e.currentTarget.style.background = 'transparent'; },
         },
           h(TypeGlyph, { glyph: NAV_GLYPHS[id], size: 14 }),
-          h('span', { style: { flex: 1 } }, t('tab.' + id)),
+          h('span', { className: 'ws-nav-label', style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, t('tab.' + id)),
         );
       };
 
-      /** 面板骨架：左侧导航 + 右侧内容（各视图自己滚动）。 */
+      /** 面板骨架：左侧导航 + 右侧内容（各视图自己滚动）。窄容器（右栏 tab）自动折叠为图标条。 */
       const shell = (content) => h('div', {
+        ref: el => {
+          // 容器宽度探测：≤420px 走窄模式（导航收成图标列）；ResizeObserver 兼容缺省时跳过。
+          if (!el) return;
+          if (typeof ResizeObserver !== 'undefined') {
+            if (shell.ro) shell.ro.disconnect();
+            shell.ro = new ResizeObserver(entries => {
+              for (const entry of entries) {
+                const narrow = entry.contentRect.width <= 420;
+                entry.target.setAttribute('data-narrow', narrow ? '1' : '0');
+              }
+            });
+            shell.ro.observe(el);
+          }
+          el.setAttribute('data-worldsea-ui', '');
+        },
         style: { height: '100%', display: 'flex', boxSizing: 'border-box', overflow: 'hidden' },
       },
-        // 导航侧栏
+        // 导航侧栏（窄模式：仅图标列）
         h('div', {
           style: {
             width: DS.navWidth, flexShrink: 0, boxSizing: 'border-box',
@@ -2444,13 +2460,13 @@ window.__ModuleLoader__.load({
             borderRight: '1px solid var(--dsw-alias-border-l1)',
           },
         },
-          // 顶部品牌行
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.lg } },
+          // 顶部品牌行（窄模式隐藏文字由 CSS 处理——见全局样式 [data-narrow="1"] 规则）
+          h('div', { className: 'ws-nav-brand', style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.lg } },
             WorldIcon({ size: 22 }),
-            h('div', { style: { fontSize: DS.font.lg, fontWeight: 700 } }, 'WorldSea'),
+            h('div', { className: 'ws-nav-label', style: { fontSize: DS.font.lg, fontWeight: 700 } }, 'WorldSea'),
           ),
-          NAV_GROUPS.map(g => h('div', { key: g.id, style: { marginBottom: DS.space.md } },
-            h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-state-idle-primary)', letterSpacing: '0.06em', margin: '0 0 ' + DS.space.xs + 'px ' + DS.space.sm + 'px' } }, g.label.toUpperCase()),
+          NAV_GROUPS.map(g => h('div', { key: g.id, className: 'ws-nav-group', style: { marginBottom: DS.space.md } },
+            h('div', { className: 'ws-nav-label', style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-state-idle-primary)', letterSpacing: '0.06em', margin: '0 0 ' + DS.space.xs + 'px ' + DS.space.sm + 'px' } }, g.label.toUpperCase()),
             g.items.map(navRow),
           )),
         ),
@@ -2634,6 +2650,38 @@ window.__ModuleLoader__.load({
     function apply(ctx) {
       ctx.effect(() => ctx.locale.register(NS, dictionaries), NS + ': dictionaries');
       const t = ctx.locale.bind(NS);
+
+      // 全局样式注入：滚动条 / focus 可见性（作用域限定在插件容器内，卸载随 ctx.effect 清理）。
+      ctx.effect(() => {
+        const style = document.createElement('style');
+        style.dataset.worldsea = 'ui';
+        style.textContent = [
+          // 插件容器内的滚动条：细轨 + 圆角滑块，hover 提亮（明暗主题均走 token）。
+          '[data-worldsea-ui] ::-webkit-scrollbar { width: 8px; height: 8px; }',
+          '[data-worldsea-ui] ::-webkit-scrollbar-track { background: transparent; }',
+          '[data-worldsea-ui] ::-webkit-scrollbar-thumb { background: var(--dsw-alias-border-l2); border-radius: 4px; }',
+          '[data-worldsea-ui] ::-webkit-scrollbar-thumb:hover { background: var(--dsw-alias-state-idle-primary); }',
+          // 键盘导航的 focus 可见性：仅 focus-visible 显示品牌描边，不影响鼠标点击。
+          '[data-worldsea-ui] :focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }',
+          // 控件平滑过渡（颜色类）。
+          '[data-worldsea-ui] button, [data-worldsea-ui] input, [data-worldsea-ui] select, [data-worldsea-ui] textarea { transition: ' + DS.transition + '; }',
+          // 窄容器（右栏 tab）自适应：导航折叠为图标列，文字与分组标题隐藏。
+          '[data-worldsea-ui] [data-narrow="1"] .ws-nav-label { display: none; }',
+          '[data-worldsea-ui] [data-narrow="1"] .ws-nav-group { margin-bottom: ' + DS.space.sm + 'px !important; }',
+          '[data-worldsea-ui] [data-narrow="1"] .ws-nav-row { justify-content: center; padding: 7px 6px; }',
+        ].join('\n');
+        // 标记所有渲染根（右栏 tab 与 main 各一份），样式选择器才能命中本插件容器。
+        const mark = () => {
+          document.querySelectorAll('#root > div, [data-slot]').forEach(el => {
+            if (!el.hasAttribute('data-worldsea-ui')) el.setAttribute('data-worldsea-ui', '');
+          });
+        };
+        mark();
+        // 挂载后的兜底标记（右栏 tab 懒渲染，可能晚于 apply）。
+        setTimeout(mark, 300);
+        document.body.appendChild(style);
+        return () => { style.remove(); };
+      }, NS + ': global styles');
 
       // 底层只造一个实例（数据真正共享）；两个 handle 各挂一个 scope ——
       // ui-slots 校验「one handle, one scope」：main 是 root，右栏 tab 是 session。
