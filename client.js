@@ -809,8 +809,8 @@ window.__ModuleLoader__.load({
     // ─────────────────────────────────────────────
 
     /**
-     * 设计常量（对齐 WorldSea theme.css 令牌体系：精致极简 · 暖灰中性底 + 克制靛蓝强调）。
-     * 字号/圆角/动效曲线与 WorldSea 同值；颜色经 DS 色→dsh token 映射表落地（WS_COLORS）。
+     * 设计常量（对齐 WorldSea theme.css 令牌体系，色值取自原生暗色界面截图实测）。
+     * 颜色走 --ws-* 自有变量（S1 主题轴注入），DS 表存回退值。
      * canvas 内无法用 CSS var，GraphView.TYPE_COLORS 仍用具体色值。
      */
     const DS = {
@@ -827,11 +827,42 @@ window.__ModuleLoader__.load({
       pressScale: 0.96,
       transition: 'background 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
       /** 交互态背景（--hover-bg 语义 = bg-muted）。 */
-      hoverBg: 'var(--dsw-alias-bg-layer-2)',
-      /** WorldSea active 语义 = accent-soft 弱底（非左侧条）；dsh 无 accent-soft token，用 brand 主色 12% 近似。 */
-      activeBg: 'color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent)',
-      focusShadow: '0 0 0 2px var(--dsw-alias-brand-primary)',
+      hoverBg: 'var(--ws-bg-muted)',
+      /** WorldSea active 语义 = accent-soft 弱底（原生 .ws-sn-view.active 同款）。 */
+      activeBg: 'var(--ws-accent-soft)',
+      focusShadow: '0 0 0 2px var(--ws-accent)',
     };
+
+    /**
+     * WorldSea 主题轴（--ws-*，S1）：暗色底 + 绿色 accent，色值对齐原生截图。
+     * 注入在插件容器（[data-worldsea-theme]）上，与 dsh 宿主主题解耦——
+     * 组件内一律 var(--ws-*)，不直接引用 dsw token（宿主主题不再影响插件观感）。
+     */
+    const WS_THEME = {
+      'ws-bg-app': '#111113',
+      'ws-bg-surface': '#18181b',
+      'ws-bg-muted': '#202024',
+      'ws-bg-active': '#2e2e34',
+      'ws-border': '#27272c',
+      'ws-border-strong': '#38383f',
+      'ws-text-primary': '#e7e7ea',
+      'ws-text-secondary': '#a1a1aa',
+      'ws-text-muted': '#71717a',
+      'ws-accent': '#34d399',
+      'ws-accent-hover': '#6ee7b7',
+      'ws-accent-soft': 'rgba(52, 211, 153, 0.14)',
+      'ws-accent-soft-border': 'rgba(52, 211, 153, 0.35)',
+      'ws-accent-grad-to': '#10b981',
+      'ws-on-accent': '#0b1512',
+      'ws-danger': '#f87171',
+      'ws-warning': '#fbbf24',
+      'ws-success': '#34d399',
+      'ws-ring': 'rgba(52, 211, 153, 0.4)',
+      'ws-shadow-sm': '0 1px 2px rgba(0, 0, 0, 0.4)',
+      'ws-shadow-md': '0 4px 16px rgba(0, 0, 0, 0.45)',
+    };
+    /** var(--ws-x, 回退) 形式的安全引用。 */
+    const wsVar = (name, fallback) => `var(--${name}, ${fallback})`;
 
     /** 控件基础态（focus 可见性 + 过渡；不参与布局）。 */
     const dsControlBase = {
@@ -840,15 +871,15 @@ window.__ModuleLoader__.load({
     };
     const dsFocus = {
       outline: 'none',
-      '::placeholder': { color: 'var(--dsw-alias-state-idle-primary)' },
+      '::placeholder': { color: 'var(--ws-text-muted)' },
     };
 
     /** 输入控件公共样式（select/textarea/input 共用）。 */
     const inputStyle = {
       ...dsControlBase,
       width: '100%', boxSizing: 'border-box', padding: '6px 10px',
-      borderRadius: DS.radius.sm, border: '1px solid var(--dsw-alias-border-l1)',
-      background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)',
+      borderRadius: DS.radius.sm, border: '1px solid var(--ws-border)',
+      background: 'var(--ws-bg-surface)', color: 'var(--ws-text-primary)',
       fontSize: DS.font.md, outline: 'none',
     };
 
@@ -859,8 +890,8 @@ window.__ModuleLoader__.load({
         style: {
           ...dsControlBase,
           padding: props.small ? '3px 10px' : '6px 14px',
-          borderRadius: DS.radius.sm, border: '1px solid var(--dsw-alias-border-l2)',
-          background: 'transparent', color: 'var(--dsw-alias-label-primary)',
+          borderRadius: DS.radius.sm, border: '1px solid var(--ws-border-strong)',
+          background: 'transparent', color: 'var(--ws-text-primary)',
           fontSize: props.small ? DS.font.sm : DS.font.md, cursor: 'pointer',
         },
         onMouseOver: e => { e.currentTarget.style.background = DS.hoverBg; },
@@ -876,7 +907,7 @@ window.__ModuleLoader__.load({
           ...dsControlBase,
           padding: props.small ? '3px 10px' : '6px 14px',
           borderRadius: DS.radius.sm, border: 'none',
-          background: 'var(--dsw-alias-brand-primary)', color: '#fff',
+          background: 'var(--ws-accent)', color: '#fff',
           fontSize: props.small ? DS.font.sm : DS.font.md, fontWeight: 600, cursor: 'pointer',
         },
         onMouseOver: e => { e.currentTarget.style.opacity = '0.88'; },
@@ -891,11 +922,11 @@ window.__ModuleLoader__.load({
         style: {
           ...dsControlBase,
           padding: props.small ? '3px 10px' : '6px 14px',
-          borderRadius: DS.radius.sm, border: '1px solid var(--dsw-alias-state-error-primary)',
-          background: 'transparent', color: 'var(--dsw-alias-state-error-primary)',
+          borderRadius: DS.radius.sm, border: '1px solid var(--ws-danger)',
+          background: 'transparent', color: 'var(--ws-danger)',
           fontSize: props.small ? DS.font.sm : DS.font.md, cursor: 'pointer',
         },
-        onMouseOver: e => { e.currentTarget.style.background = 'var(--dsw-alias-bg-layer-2)'; },
+        onMouseOver: e => { e.currentTarget.style.background = 'var(--ws-bg-muted)'; },
         onMouseOut: e => { e.currentTarget.style.background = 'transparent'; },
       }, props.children);
     }
@@ -903,25 +934,25 @@ window.__ModuleLoader__.load({
     /** 卡片容器（对齐 WorldSea .entity-card：1px 独立块 + hover 强边 + active accent 双描边）。 */
     function Card(props) {
       const clickable = props.onClick !== undefined;
-      const baseBorder = clickable && props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l1)';
+      const baseBorder = clickable && props.active ? 'var(--ws-accent)' : 'var(--ws-border)';
       return h('div', {
         onClick: props.onClick,
         style: {
           ...dsControlBase,
-          background: clickable && props.active ? DS.activeBg : 'var(--dsw-alias-bg-layer-1)',
+          background: clickable && props.active ? DS.activeBg : 'var(--ws-bg-surface)',
           border: '1px solid ' + baseBorder,
           borderRadius: DS.radius.mid, padding: props.pad || DS.space.lg,
           ...(clickable ? { cursor: 'pointer' } : {}),
-          ...(clickable && props.active ? { boxShadow: '0 0 0 1px var(--dsw-alias-brand-primary)' } : {}),
+          ...(clickable && props.active ? { boxShadow: '0 0 0 1px var(--ws-accent)' } : {}),
         },
         ...(clickable ? {
           onMouseOver: e => {
-            e.currentTarget.style.borderColor = props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l2)';
-            e.currentTarget.style.boxShadow = props.active ? '0 0 0 1px var(--dsw-alias-brand-primary)' : '0 1px 2px rgba(16, 24, 40, 0.05)';
+            e.currentTarget.style.borderColor = props.active ? 'var(--ws-accent)' : 'var(--ws-border-strong)';
+            e.currentTarget.style.boxShadow = props.active ? '0 0 0 1px var(--ws-accent)' : '0 1px 2px rgba(16, 24, 40, 0.05)';
           },
           onMouseOut: e => {
             e.currentTarget.style.borderColor = baseBorder;
-            e.currentTarget.style.boxShadow = props.active ? '0 0 0 1px var(--dsw-alias-brand-primary)' : 'none';
+            e.currentTarget.style.boxShadow = props.active ? '0 0 0 1px var(--ws-accent)' : 'none';
           },
         } : {}),
       }, props.children);
@@ -929,20 +960,20 @@ window.__ModuleLoader__.load({
 
     /** 区块标题（小型节标题，带字距）。 */
     function SectionTitle(props) {
-      return h('div', { style: { fontSize: DS.font.sm, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', letterSpacing: '0.04em', margin: '0 0 ' + DS.space.sm + 'px' } }, props.children);
+      return h('div', { style: { fontSize: DS.font.sm, fontWeight: 600, color: 'var(--ws-text-secondary)', letterSpacing: '0.04em', margin: '0 0 ' + DS.space.sm + 'px' } }, props.children);
     }
 
     /** 空状态（居中弱文本；可选动作）。 */
     function EmptyState(props) {
       return h('div', {
-        style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: DS.font.md, padding: DS.space.xxl, lineHeight: 1.8 },
+        style: { textAlign: 'center', color: 'var(--ws-text-secondary)', fontSize: DS.font.md, padding: DS.space.xxl, lineHeight: 1.8 },
       }, props.children, props.action || null);
     }
 
     /** 字段包装（label 上、控件下的表单行）。 */
     function Field(props) {
       return h('div', { style: { marginBottom: DS.space.md } },
-        h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: DS.space.xs } }, props.label),
+        h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginBottom: DS.space.xs } }, props.label),
         props.children,
       );
     }
@@ -953,9 +984,9 @@ window.__ModuleLoader__.load({
         style: {
           display: 'inline-flex', alignItems: 'center', gap: DS.space.xs,
           padding: '2px 8px', borderRadius: DS.radius.pill, fontSize: DS.font.sm,
-          background: props.tone === 'brand' ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-2)',
-          color: props.tone === 'brand' ? '#fff' : 'var(--dsw-alias-label-secondary)',
-          border: props.tone === 'brand' ? 'none' : '1px solid var(--dsw-alias-border-l1)',
+          background: props.tone === 'brand' ? 'var(--ws-accent)' : 'var(--ws-bg-muted)',
+          color: props.tone === 'brand' ? '#fff' : 'var(--ws-text-secondary)',
+          border: props.tone === 'brand' ? 'none' : '1px solid var(--ws-border)',
         },
       }, props.children);
     }
@@ -1149,7 +1180,7 @@ window.__ModuleLoader__.load({
         showCustom ? h('div', {
           style: {
             marginBottom: 10, padding: 10, borderRadius: DS.radius.md,
-            background: 'var(--dsw-alias-bg-layer-2)', fontSize: DS.font.sm,
+            background: 'var(--ws-bg-muted)', fontSize: DS.font.sm,
           },
         },
           h('div', { style: { fontWeight: 600, marginBottom: 6 } }, t('relations.customTitle')),
@@ -1176,23 +1207,23 @@ window.__ModuleLoader__.load({
               key: r.type,
               style: {
                 display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px',
-                borderRadius: DS.radius.pill, background: 'var(--dsw-alias-bg-layer-1)',
-                border: '1px solid var(--dsw-alias-border-l1)',
+                borderRadius: DS.radius.pill, background: 'var(--ws-bg-surface)',
+                border: '1px solid var(--ws-border)',
               },
             },
               r.label + '（' + r.type + (r.symmetric ? ' ⇄ 自身' : ' ⇄ ' + r.inverseType) + '）',
               h('button', {
                 onClick: () => actions.removeCustomRelationType(r.type),
-                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-state-error-primary)', padding: 0, fontSize: DS.font.xs },
+                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ws-danger)', padding: 0, fontSize: DS.font.xs },
               }, '×'),
             ))) : null,
         ) : null,
         rows.length === 0
-          ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('relations.empty'))
+          ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, t('relations.empty'))
           : h('div', null, rows.map(row => h(RelationRow, {
             key: row.id, row, actions, t,
           }))),
-        h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', marginTop: 8 } }, t('relations.hint')),
+        h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)', marginTop: 8 } }, t('relations.hint')),
       );
     }
 
@@ -1206,20 +1237,20 @@ window.__ModuleLoader__.load({
           style: {
             display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px',
             fontSize: DS.font.md, borderRadius: DS.radius.sm, marginBottom: 2,
-            background: 'var(--dsw-alias-bg-layer-2)',
+            background: 'var(--ws-bg-muted)',
           },
         },
           h('span', { style: { flex: 1 } }, row.text),
-          note ? h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, '📝 ' + note.slice(0, 16)) : null,
+          note ? h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } }, '📝 ' + note.slice(0, 16)) : null,
           h('button', {
             onClick: () => setOpen(!open),
-            style: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: DS.font.sm, color: 'var(--dsw-alias-brand-primary)' },
+            style: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: DS.font.sm, color: 'var(--ws-accent)' },
           }, open ? '▾' : t('relations.editProps')),
           h('button', {
             onClick: () => actions.removeRelation(row.id),
             style: {
               border: 'none', background: 'transparent', cursor: 'pointer', fontSize: DS.font.sm,
-              color: 'var(--dsw-alias-state-error-primary)',
+              color: 'var(--ws-danger)',
             },
           }, t('relations.remove')),
         ),
@@ -1244,14 +1275,14 @@ window.__ModuleLoader__.load({
           style: {
             display: 'inline-flex', alignItems: 'center', gap: 4,
             padding: '2px 8px', borderRadius: DS.radius.pill, fontSize: DS.font.sm,
-            background: 'var(--dsw-alias-bg-layer-2)',
-            border: '1px solid var(--dsw-alias-border-l1)',
+            background: 'var(--ws-bg-muted)',
+            border: '1px solid var(--ws-border)',
           },
         },
           tag,
           h('button', {
             onClick: () => actions.removeTag(entity.id, tag),
-            style: { border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: DS.font.xs },
+            style: { border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: 'var(--ws-text-secondary)', fontSize: DS.font.xs },
           }, '×'),
         )),
         h('input', {
@@ -1374,13 +1405,13 @@ window.__ModuleLoader__.load({
           style: {
             display: 'flex', alignItems: 'center', gap: DS.space.sm,
             padding: '0 ' + DS.space.md + 'px', height: 44, flexShrink: 0,
-            background: 'var(--dsw-alias-bg-layer-1)',
-            border: '1px solid var(--dsw-alias-border-l1)',
+            background: 'var(--ws-bg-surface)',
+            border: '1px solid var(--ws-border)',
             borderRadius: DS.radius.md, marginBottom: DS.space.md,
           },
         },
-          h('button', { onClick: () => { setTab('outline'); setSelectedId(null); }, style: { ...dsControlBase, padding: '4px 10px', borderRadius: DS.radius.sm, border: 'none', background: tab === 'outline' ? DS.activeBg : 'transparent', color: tab === 'outline' ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-secondary)', fontSize: DS.font.sm, cursor: 'pointer', fontWeight: tab === 'outline' ? 600 : 400 } }, t('writing.outline') + ' (' + nodes.length + ')'),
-          h('button', { onClick: () => { setTab('notes'); setSelectedId(null); }, style: { ...dsControlBase, padding: '4px 10px', borderRadius: DS.radius.sm, border: 'none', background: tab === 'notes' ? DS.activeBg : 'transparent', color: tab === 'notes' ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-secondary)', fontSize: DS.font.sm, cursor: 'pointer', fontWeight: tab === 'notes' ? 600 : 400 } }, t('writing.notes') + ' (' + notes.length + ')'),
+          h('button', { onClick: () => { setTab('outline'); setSelectedId(null); }, style: { ...dsControlBase, padding: '4px 10px', borderRadius: DS.radius.sm, border: 'none', background: tab === 'outline' ? DS.activeBg : 'transparent', color: tab === 'outline' ? 'var(--ws-accent)' : 'var(--ws-text-secondary)', fontSize: DS.font.sm, cursor: 'pointer', fontWeight: tab === 'outline' ? 600 : 400 } }, t('writing.outline') + ' (' + nodes.length + ')'),
+          h('button', { onClick: () => { setTab('notes'); setSelectedId(null); }, style: { ...dsControlBase, padding: '4px 10px', borderRadius: DS.radius.sm, border: 'none', background: tab === 'notes' ? DS.activeBg : 'transparent', color: tab === 'notes' ? 'var(--ws-accent)' : 'var(--ws-text-secondary)', fontSize: DS.font.sm, cursor: 'pointer', fontWeight: tab === 'notes' ? 600 : 400 } }, t('writing.notes') + ' (' + notes.length + ')'),
           h('div', { style: { flex: 1 } }),
           h(PrimaryButton, {
             small: true,
@@ -1398,7 +1429,7 @@ window.__ModuleLoader__.load({
           h(Card, { pad: 8 },
             tab === 'outline'
               ? (outlineRows.length === 0
-                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', padding: 8 } }, t('writing.emptyOutline'))
+                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', padding: 8 } }, t('writing.emptyOutline'))
                 : outlineRows.map(({ node, depth }) => h('div', {
                   key: node.id,
                   onClick: () => setSelectedId(node.id),
@@ -1407,26 +1438,26 @@ window.__ModuleLoader__.load({
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '5px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md,
                     marginBottom: 2,
-                    background: selectedId === node.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                    background: selectedId === node.id ? 'var(--ws-bg-muted)' : 'transparent',
                     fontWeight: depth === 0 ? 600 : 400,
                   },
                 },
-                  h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
+                  h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } },
                     node.properties.condition || ''),
                   h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, node.title),
                 )))
               : (notes.length === 0
-                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', padding: 8 } }, t('writing.emptyNotes'))
+                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', padding: 8 } }, t('writing.emptyNotes'))
                 : notes.map(n => h('div', {
                   key: n.id,
                   onClick: () => setSelectedId(n.id),
                   style: {
                     padding: '5px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md, marginBottom: 2,
-                    background: selectedId === n.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                    background: selectedId === n.id ? 'var(--ws-bg-muted)' : 'transparent',
                   },
                 },
                   h('div', { style: { fontWeight: 600 } }, n.title),
-                  h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
+                  h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } },
                     n.properties.noteType + ' · ' + ((n.properties.content || '').length) + ' 字'),
                 ))),
             h('div', { style: { padding: '6px 4px 2px', display: 'flex', gap: 6 } },
@@ -1472,7 +1503,7 @@ window.__ModuleLoader__.load({
                 placeholder: t('writing.contentPlaceholder'),
                 style: { ...inputStyle, fontFamily: 'ui-monospace, monospace', lineHeight: 1.7, resize: 'vertical', minHeight: 0 },
               }),
-              h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', marginTop: DS.space.sm } },
+              h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)', marginTop: DS.space.sm } },
                 t('writing.charCount').replace('{n}', String((selected.properties.content || '').length))),
             )),
         ),
@@ -1527,13 +1558,13 @@ window.__ModuleLoader__.load({
           style: {
             display: 'flex', alignItems: 'center', gap: DS.space.sm,
             padding: '0 ' + DS.space.md + 'px', height: 44, flexShrink: 0,
-            background: 'var(--dsw-alias-bg-layer-1)',
-            border: '1px solid var(--dsw-alias-border-l1)',
+            background: 'var(--ws-bg-surface)',
+            border: '1px solid var(--ws-border)',
             borderRadius: DS.radius.md, marginBottom: DS.space.md,
           },
         },
           h(TypeGlyph, { glyph: 'manuscript', size: 14 }),
-          h('span', { style: { fontSize: DS.font.sm, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' } }, t('ms.books') + ' (' + books.length + ')'),
+          h('span', { style: { fontSize: DS.font.sm, fontWeight: 600, color: 'var(--ws-text-primary)' } }, t('ms.books') + ' (' + books.length + ')'),
           h('div', { style: { flex: 1 } }),
           h(PrimaryButton, { small: true, onClick: () => actions.create('book', t('ms.newBook')) }, t('ms.newBook')),
         ),
@@ -1547,11 +1578,11 @@ window.__ModuleLoader__.load({
                 h('span', { style: { fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, b.title),
                 h('button', {
                   onClick: () => exportBook(b),
-                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: DS.font.sm },
+                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ws-accent)', fontSize: DS.font.sm },
                 }, t('ms.exportBook')),
                 h('button', {
                   onClick: () => newChapter(b.id),
-                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: DS.font.sm },
+                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ws-accent)', fontSize: DS.font.sm },
                 }, '＋' + t('ms.chapter')),
               ),
               chapterRows(b.id).map(c => h('div', {
@@ -1560,26 +1591,26 @@ window.__ModuleLoader__.load({
                 style: {
                   display: 'flex', alignItems: 'center', gap: 6,
                   marginLeft: 16, padding: '4px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md, marginBottom: 2,
-                  background: selectedId === c.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                  background: selectedId === c.id ? 'var(--ws-bg-muted)' : 'transparent',
                 },
               },
                 h('span', {
-                  style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', width: 30 },
+                  style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)', width: 30 },
                 }, c.properties.condition || ''),
                 h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, c.title),
-                h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, (c.properties.content || '').length),
+                h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } }, (c.properties.content || '').length),
               )),
             )),
             // 未归书章节
             chapterRows('').length ? h('div', null,
-              h('div', { style: { padding: '4px 6px', fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('ms.orphaned') + ' (' + chapterRows('').length + ')'),
+              h('div', { style: { padding: '4px 6px', fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, t('ms.orphaned') + ' (' + chapterRows('').length + ')'),
               chapterRows('').map(c => h('div', {
                 key: c.id,
                 onClick: () => setSelectedId(c.id),
                 style: {
                   display: 'flex', alignItems: 'center', gap: 6,
                   marginLeft: 16, padding: '4px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md, marginBottom: 2,
-                  background: selectedId === c.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                  background: selectedId === c.id ? 'var(--ws-bg-muted)' : 'transparent',
                 },
               }, h('span', { style: { flex: 1 } }, c.title))),
             ) : null,
@@ -1619,7 +1650,7 @@ window.__ModuleLoader__.load({
                   style: { ...inputStyle, width: 130 },
                 }),
                 h('div', { style: { flex: 1 } }),
-                h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, t('writing.charCount').replace('{n}', String(contentLen))),
+                h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } }, t('writing.charCount').replace('{n}', String(contentLen))),
               ),
               h('textarea', {
                 value: selected.properties.content || '',
@@ -1695,12 +1726,12 @@ window.__ModuleLoader__.load({
               h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 } },
                 h(TypeGlyph, { glyph: g.def.glyph, size: 15 }),
                 h('div', { style: { fontSize: DS.font.lg, fontWeight: 700 } }, g.def.label),
-                h('span', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, '× ' + g.items.length),
+                h('span', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, '× ' + g.items.length),
               ),
-              g.items.map(e => h('div', { key: e.id, style: { padding: '8px 0', borderTop: '1px solid var(--dsw-alias-border-l1)' } },
+              g.items.map(e => h('div', { key: e.id, style: { padding: '8px 0', borderTop: '1px solid var(--ws-border)' } },
                 h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600 } }, e.title),
-                e.description ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginTop: 2, whiteSpace: 'pre-wrap' } }, e.description.slice(0, 120)) : null,
-                e.tags.length ? h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-brand-primary)', marginTop: 2 } }, e.tags.join(' · ')) : null,
+                e.description ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginTop: 2, whiteSpace: 'pre-wrap' } }, e.description.slice(0, 120)) : null,
+                e.tags.length ? h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-accent)', marginTop: 2 } }, e.tags.join(' · ')) : null,
               )),
             ))),
       );
@@ -1720,11 +1751,11 @@ window.__ModuleLoader__.load({
             h(PrimaryButton, { small: true, onClick: run }, t('health.run')),
           ),
           !report
-            ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('health.hint'))
+            ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, t('health.hint'))
             : report.length === 0
-              ? h('div', { style: { fontSize: DS.font.md, color: 'var(--dsw-alias-state-success-primary)' } }, t('health.clean'))
+              ? h('div', { style: { fontSize: DS.font.md, color: 'var(--ws-success)' } }, t('health.clean'))
               : h('div', null,
-                h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 8 } },
+                h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginBottom: 8 } },
                   t('health.summary')
                     .replace('{d}', String(dangling.length))
                     .replace('{dup}', String(report.filter(i => i.kind === 'duplicateTitle').length))
@@ -1738,14 +1769,14 @@ window.__ModuleLoader__.load({
                     key: issue.kind + '::' + issue.id,
                     style: {
                       display: 'flex', gap: 8, padding: '4px 8px', borderRadius: DS.radius.sm, fontSize: DS.font.sm,
-                      background: 'var(--dsw-alias-bg-layer-2)',
-                      color: issue.kind === 'emptyTitle' ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-label-primary)',
+                      background: 'var(--ws-bg-muted)',
+                      color: issue.kind === 'emptyTitle' ? 'var(--ws-warning)' : 'var(--ws-text-primary)',
                     },
                   },
                     h('span', {
                       style: {
                         padding: '0 6px', borderRadius: DS.radius.sm, fontSize: DS.font.xs, fontWeight: 600,
-                        background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-secondary)',
+                        background: 'var(--ws-bg-surface)', color: 'var(--ws-text-secondary)',
                       },
                     }, issue.kind),
                     h('span', null, issue.text),
@@ -1929,7 +1960,7 @@ window.__ModuleLoader__.load({
       return h('div', { style: { position: 'relative' } },
         // 边筛选条。
         h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' } },
-          h('span', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('graph.filter')),
+          h('span', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, t('graph.filter')),
           h('select', {
             value: edgeFilter,
             onChange: e => setEdgeFilter(e.target.value),
@@ -1941,8 +1972,8 @@ window.__ModuleLoader__.load({
         h('canvas', {
           ref: canvasRef,
           style: {
-            borderRadius: DS.radius.md, border: '1px solid var(--dsw-alias-border-l1)',
-            background: 'var(--dsw-alias-bg-layer-1)', display: 'block', cursor: 'grab',
+            borderRadius: DS.radius.md, border: '1px solid var(--ws-border)',
+            background: 'var(--ws-bg-surface)', display: 'block', cursor: 'grab',
           },
           onMouseDown: e => { const n = pick(e); if (n) dragRef.current = n; },
           onMouseMove: e => {
@@ -1962,13 +1993,13 @@ window.__ModuleLoader__.load({
           onMouseLeave: () => { dragRef.current = null; hoverRef.current = null; },
         }),
         // 图例。
-        h('div', { style: { display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } },
+        h('div', { style: { display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } },
           Object.keys(TYPE_COLORS).map(type => h('span', { key: type, style: { display: 'inline-flex', alignItems: 'center', gap: 4 } },
             h('span', { style: { width: 8, height: 8, borderRadius: 99, background: TYPE_COLORS[type], display: 'inline-block' } }),
             ENTITY_TYPES.find(x => x.type === type)?.label || type,
           ))),
         entities.length === 0
-          ? h('div', { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: DS.font.md, color: 'var(--dsw-alias-label-secondary)' } }, t('graph.empty'))
+          ? h('div', { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: DS.font.md, color: 'var(--ws-text-secondary)' } }, t('graph.empty'))
           : null,
       );
     }
@@ -2003,7 +2034,7 @@ window.__ModuleLoader__.load({
             h('div', {
               style: {
                 position: 'absolute', left: 5, top: 4, bottom: 4, width: 2,
-                background: 'var(--dsw-alias-border-l2)', borderRadius: 2,
+                background: 'var(--ws-border-strong)', borderRadius: 2,
               },
             }),
             dated.map(({ entity, date, dateEnd }) => h('div', { key: entity.id, style: { position: 'relative', marginBottom: 10 } },
@@ -2011,30 +2042,30 @@ window.__ModuleLoader__.load({
               h('div', {
                 style: {
                   position: 'absolute', left: -18, top: 5, width: 10, height: 10,
-                  borderRadius: 99, background: 'var(--dsw-alias-brand-primary)',
-                  boxShadow: '0 0 0 3px var(--dsw-alias-bg-base)',
+                  borderRadius: 99, background: 'var(--ws-accent)',
+                  boxShadow: '0 0 0 3px var(--ws-bg-app)',
                 },
               }),
               h('div', {
                 onClick: () => { actions.selectEntity(entity.id); actions.setView('workbench'); },
                 style: {
                   display: 'inline-block', padding: '5px 12px', borderRadius: DS.radius.md, cursor: 'pointer',
-                  background: 'var(--dsw-alias-bg-layer-1)', border: '1px solid var(--dsw-alias-border-l1)',
+                  background: 'var(--ws-bg-surface)', border: '1px solid var(--ws-border)',
                 },
               },
                 h('div', { style: { display: 'flex', gap: 8, alignItems: 'baseline' } },
                   h('span', {
                     style: {
                       fontSize: DS.font.sm, fontFamily: 'ui-monospace, monospace',
-                      color: 'var(--dsw-alias-brand-primary)', fontWeight: 600,
+                      color: 'var(--ws-accent)', fontWeight: 600,
                     },
                   }, date + (dateEnd ? ' → ' + dateEnd : '')),
-                  h('span', { style: { fontSize: DS.font.md + 1, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' } }, entity.title),
-                  h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
+                  h('span', { style: { fontSize: DS.font.md + 1, fontWeight: 600, color: 'var(--ws-text-primary)' } }, entity.title),
+                  h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } },
                     ENTITY_TYPES.find(x => x.type === entity.type)?.label || entity.type),
                 ),
                 entity.description
-                  ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginTop: 2 } },
+                  ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginTop: 2 } },
                     entity.description.slice(0, 80) + (entity.description.length > 80 ? '…' : ''))
                   : null,
               ),
@@ -2042,7 +2073,7 @@ window.__ModuleLoader__.load({
         ),
         undated.length ? h('div', { style: { marginTop: 12 } },
           h(Card, { pad: 14 },
-            h('div', { style: { fontSize: DS.font.md, fontWeight: 600, marginBottom: 8, color: 'var(--dsw-alias-label-secondary)' } },
+            h('div', { style: { fontSize: DS.font.md, fontWeight: 600, marginBottom: 8, color: 'var(--ws-text-secondary)' } },
               t('timeline.undated') + ' · ' + undated.length),
             h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
               undated.slice(0, 30).map(e => h('span', {
@@ -2050,8 +2081,8 @@ window.__ModuleLoader__.load({
                 onClick: () => { actions.selectEntity(e.id); actions.setView('workbench'); },
                 style: {
                   padding: '3px 10px', borderRadius: DS.radius.pill, fontSize: DS.font.sm, cursor: 'pointer',
-                  background: 'var(--dsw-alias-bg-layer-1)', border: '1px solid var(--dsw-alias-border-l1)',
-                  color: 'var(--dsw-alias-label-secondary)',
+                  background: 'var(--ws-bg-surface)', border: '1px solid var(--ws-border)',
+                  color: 'var(--ws-text-secondary)',
                 },
               }, e.title))))) : null,
       );
@@ -2063,8 +2094,8 @@ window.__ModuleLoader__.load({
       if (!editing) {
         if (value === undefined || value === '') return null;
         return h('div', { style: { display: 'flex', gap: 12, padding: '5px 0', fontSize: DS.font.md } },
-          h('span', { style: { width: 90, flexShrink: 0, color: 'var(--dsw-alias-label-secondary)' } }, field.label),
-          h('span', { style: { color: 'var(--dsw-alias-label-primary)', whiteSpace: 'pre-wrap' } }, String(value)),
+          h('span', { style: { width: 90, flexShrink: 0, color: 'var(--ws-text-secondary)' } }, field.label),
+          h('span', { style: { color: 'var(--ws-text-primary)', whiteSpace: 'pre-wrap' } }, String(value)),
         );
       }
       let control;
@@ -2098,7 +2129,7 @@ window.__ModuleLoader__.load({
         });
       }
       return h('div', { style: { marginBottom: 10 } },
-        h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, field.label),
+        h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginBottom: 4 } }, field.label),
         control,
       );
     }
@@ -2113,16 +2144,16 @@ window.__ModuleLoader__.load({
           onClick: () => setOpen(!open),
           style: {
             display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer',
-            borderRadius: DS.radius.md, background: 'var(--dsw-alias-bg-layer-2)', fontSize: DS.font.md,
+            borderRadius: DS.radius.md, background: 'var(--ws-bg-muted)', fontSize: DS.font.md,
           },
         },
           h(TypeGlyph, { glyph: group.glyph, size: 13 }),
           h('span', { style: { fontWeight: 600 } }, group.label),
           filled ? h('span', {
-            style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-state-success-primary)' },
+            style: { fontSize: DS.font.xs, color: 'var(--ws-success)' },
           }, t('facet.filled')) : null,
           h('span', { style: { flex: 1 } }),
-          h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, open ? '▾' : '▸'),
+          h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } }, open ? '▾' : '▸'),
         ),
         open ? h(Card, { pad: 12 },
           group.fields.map(f => h(FieldRow, {
@@ -2152,8 +2183,8 @@ window.__ModuleLoader__.load({
         onClick: () => setTab(id),
         style: {
           ...dsControlBase,
-          padding: '6px 4px', border: 'none', borderBottom: '2px solid ' + (tab === id ? 'var(--dsw-alias-brand-primary)' : 'transparent'),
-          background: 'transparent', color: tab === id ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-secondary)',
+          padding: '6px 4px', border: 'none', borderBottom: '2px solid ' + (tab === id ? 'var(--ws-accent)' : 'transparent'),
+          background: 'transparent', color: tab === id ? 'var(--ws-accent)' : 'var(--ws-text-secondary)',
           fontSize: DS.font.sm, cursor: 'pointer', fontWeight: tab === id ? 600 : 400,
         },
       }, label);
@@ -2161,14 +2192,14 @@ window.__ModuleLoader__.load({
       if (!editing) {
         return h('div', { style: { display: 'flex', flexDirection: 'column', minHeight: 0 } },
           // Tab 头
-          h('div', { style: { display: 'flex', gap: DS.space.md, borderBottom: '1px solid var(--dsw-alias-border-l1)', marginBottom: DS.space.md, flexShrink: 0 } },
+          h('div', { style: { display: 'flex', gap: DS.space.md, borderBottom: '1px solid var(--ws-border)', marginBottom: DS.space.md, flexShrink: 0 } },
             tabBtn('info', t('detail.tabInfo')),
             facetGroups.length ? tabBtn('facet', t('detail.tabFacet') + ' (' + facetGroups.length + ')') : null,
             tabBtn('relations', t('detail.tabRelations')),
           ),
           // 操作行（编辑/删除随 tab 常驻右上——对齐 WorldSea 详情头部动作区）
           h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.md, flexShrink: 0 } },
-            h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
+            h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } },
               entity.updatedAt.slice(0, 10) + ' · ' + entity.id),
             h('div', { style: { flex: 1 } }),
             h(PrimaryButton, { small: true, onClick: () => actions.beginEdit(entity.id) }, t('detail.edit')),
@@ -2204,12 +2235,12 @@ window.__ModuleLoader__.load({
           h(PrimaryButton, { small: true, onClick: () => actions.commitEdit() }, t('detail.save')),
         ),
         h(Card, null,
-          h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, t('detail.titleLabel')),
+          h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginBottom: 4 } }, t('detail.titleLabel')),
           h('input', {
             value: draft.title, onChange: e => actions.editDraft({ title: e.target.value }),
             style: { ...inputStyle, marginBottom: 10 },
           }),
-          h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 4 } }, t('detail.descLabel')),
+          h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginBottom: 4 } }, t('detail.descLabel')),
           h('textarea', {
             value: draft.description, rows: 2,
             onChange: e => actions.editDraft({ description: e.target.value }),
@@ -2293,12 +2324,12 @@ window.__ModuleLoader__.load({
             onChange: e => { const f = e.target.files && e.target.files[0]; if (f) importJson(f); e.target.value = ''; },
           }),
         ),
-        snapshot ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
+        snapshot ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginTop: 6 } },
           t('data.counts').replace('{e}', String(snapshot.entities.length)).replace('{r}', String(snapshot.relations.length))
           + (usage !== null ? ' · ' + t('data.usage').replace('{kb}', String(Math.round(usage / 1024))) : '')) : null,
-        snapshot && stale && snapshot.entities.length > 0 ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-state-warn-primary)', marginTop: 4 } },
+        snapshot && stale && snapshot.entities.length > 0 ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-warning)', marginTop: 4 } },
           t('data.staleReminder')) : null,
-        notice ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-state-success-primary)', marginTop: 4 } }, notice) : null,
+        notice ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-success)', marginTop: 4 } }, notice) : null,
       );
     }
 
@@ -2321,22 +2352,22 @@ window.__ModuleLoader__.load({
           WorldIcon({ size: 36 }),
           h('div', null,
             h('div', { style: { fontSize: DS.font.xl, fontWeight: 600 } }, 'WorldSea'),
-            h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('tagline')),
+            h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, t('tagline')),
           ),
         ),
-        h('p', { style: { fontSize: DS.font.md, lineHeight: 1.7, color: 'var(--dsw-alias-label-secondary)', margin: '0 0 16px' } }, t('intro')),
+        h('p', { style: { fontSize: DS.font.md, lineHeight: 1.7, color: 'var(--ws-text-secondary)', margin: '0 0 16px' } }, t('intro')),
         h(Card, { pad: 14 },
           LINKS.map(link => h('a', {
             key: link.id, href: link.href, target: '_blank', rel: 'noreferrer',
             style: {
               display: 'block', padding: '6px 10px', borderRadius: DS.radius.sm, marginBottom: 4,
-              fontSize: DS.font.md, color: 'var(--dsw-alias-brand-primary)', textDecoration: 'none',
-              background: 'var(--dsw-alias-bg-layer-1)',
+              fontSize: DS.font.md, color: 'var(--ws-accent)', textDecoration: 'none',
+              background: 'var(--ws-bg-surface)',
             },
           }, t('links.' + link.id) + ' — ' + link.href.replace('https://', ''))),
           h('div', { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 } },
             h(PrimaryButton, { onClick: launchDesktop }, t('launch.button')),
-            h('span', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('launch.hint')),
+            h('span', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, t('launch.hint')),
           ),
         ),
       );
@@ -2361,8 +2392,8 @@ window.__ModuleLoader__.load({
           onClick: () => setOpen(!open),
           style: {
             padding: '3px 12px', borderRadius: DS.radius.pill, cursor: 'pointer', fontSize: DS.font.sm,
-            border: '1px dashed var(--dsw-alias-border-l2)', background: 'transparent',
-            color: 'var(--dsw-alias-label-secondary)',
+            border: '1px dashed var(--ws-border-strong)', background: 'transparent',
+            color: 'var(--ws-text-secondary)',
           },
         }, open ? t('customType.close') : t('customType.open')),
         open ? h(Card, { pad: 12 },
@@ -2392,14 +2423,14 @@ window.__ModuleLoader__.load({
               key: ct.type,
               style: {
                 display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px',
-                borderRadius: DS.radius.pill, fontSize: DS.font.sm, background: 'var(--dsw-alias-bg-layer-2)',
-                border: '1px solid var(--dsw-alias-border-l1)',
+                borderRadius: DS.radius.pill, fontSize: DS.font.sm, background: 'var(--ws-bg-muted)',
+                border: '1px solid var(--ws-border)',
               },
             },
               ct.label + '（' + ct.type + ' · ' + entities.filter(e => e.type === ct.type).length + '）',
               h('button', {
                 onClick: () => { if (window.confirm(t('customType.removeConfirm').replace('{label}', ct.label))) actions.removeCustomEntityType(ct.type); },
-                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-state-error-primary)', padding: 0, fontSize: DS.font.xs },
+                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ws-danger)', padding: 0, fontSize: DS.font.xs },
               }, '×'),
             ))) : null,
         ) : null,
@@ -2480,7 +2511,7 @@ window.__ModuleLoader__.load({
             display: 'flex', alignItems: 'center', gap: DS.space.sm,
             padding: '6px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.sm,
             background: active ? DS.activeBg : 'transparent',
-            color: active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-primary)',
+            color: active ? 'var(--ws-accent)' : 'var(--ws-text-primary)',
             fontWeight: active ? 500 : 400,
           },
           onMouseOver: e => { if (!active) e.currentTarget.style.background = DS.hoverBg; },
@@ -2516,7 +2547,7 @@ window.__ModuleLoader__.load({
             width: DS.navWidth, flexShrink: 0, boxSizing: 'border-box',
             padding: DS.space.lg + 'px ' + DS.space.md + 'px',
             overflowY: 'auto',
-            borderRight: '1px solid var(--dsw-alias-border-l1)',
+            borderRight: '1px solid var(--ws-border)',
           },
         },
           // 顶部品牌行（窄模式隐藏文字由 CSS 处理——见全局样式 [data-narrow="1"] 规则）
@@ -2525,7 +2556,7 @@ window.__ModuleLoader__.load({
             h('div', { className: 'ws-nav-label', style: { fontSize: DS.font.lg, fontWeight: 700 } }, 'WorldSea'),
           ),
           NAV_GROUPS.map(g => h('div', { key: g.id, className: 'ws-nav-group', style: { marginBottom: DS.space.md } },
-            h('div', { className: 'ws-nav-label', style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-state-idle-primary)', letterSpacing: '0.06em', margin: '0 0 ' + DS.space.xs + 'px ' + DS.space.sm + 'px' } }, g.label.toUpperCase()),
+            h('div', { className: 'ws-nav-label', style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)', letterSpacing: '0.06em', margin: '0 0 ' + DS.space.xs + 'px ' + DS.space.sm + 'px' } }, g.label.toUpperCase()),
             g.items.map(navRow),
           )),
         ),
@@ -2541,12 +2572,12 @@ window.__ModuleLoader__.load({
               key: s.label,
               style: {
                 flex: '1 1 120px', padding: DS.space.sm + 'px ' + DS.space.lg + 'px',
-                borderRadius: DS.radius.md, background: 'var(--dsw-alias-bg-layer-1)',
-                border: '1px solid var(--dsw-alias-border-l1)',
+                borderRadius: DS.radius.md, background: 'var(--ws-bg-surface)',
+                border: '1px solid var(--ws-border)',
               },
             },
-              h('div', { style: { fontSize: DS.font.xl, fontWeight: 700, color: 'var(--dsw-alias-label-primary)' } }, s.value),
-              h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, s.label),
+              h('div', { style: { fontSize: DS.font.xl, fontWeight: 700, color: 'var(--ws-text-primary)' } }, s.value),
+              h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } }, s.label),
             )))
           : null,
         // 全库搜索：跨类型；有关键词且不在详情态时，在列表上方出全库命中区。
@@ -2556,7 +2587,7 @@ window.__ModuleLoader__.load({
               h('div', { style: { fontSize: DS.font.md, fontWeight: 600, marginBottom: 8 } },
                 t('search.globalTitle') + ' · ' + globalHits.length),
               globalHits.length === 0
-                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)' } }, t('search.noHits'))
+                ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, t('search.noHits'))
                 : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
                   globalHits.slice(0, 12).map(({ entity: e, where }) => h('div', {
                     key: e.id,
@@ -2564,12 +2595,12 @@ window.__ModuleLoader__.load({
                     style: {
                       display: 'flex', gap: 8, alignItems: 'center', padding: '4px 8px',
                       borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md,
-                      background: 'var(--dsw-alias-bg-layer-2)',
+                      background: 'var(--ws-bg-muted)',
                     },
                   },
                     h(TypeGlyph, { glyph: allTypes.find(x => x.type === e.type)?.glyph, size: 12 }),
                     h('span', { style: { fontWeight: 600 } }, e.title),
-                    h('span', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
+                    h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } },
                       (allTypes.find(x => x.type === e.type)?.label || e.type) + ' · ' + where),
                   )))))
           : null,
@@ -2594,8 +2625,8 @@ window.__ModuleLoader__.load({
                 style: {
                   display: 'flex', alignItems: 'center', gap: DS.space.sm,
                   padding: '0 ' + DS.space.md + 'px', height: 44, flexShrink: 0,
-                  background: 'var(--dsw-alias-bg-layer-1)',
-                  border: '1px solid var(--dsw-alias-border-l1)',
+                  background: 'var(--ws-bg-surface)',
+                  border: '1px solid var(--ws-border)',
                   borderRadius: DS.radius.md, marginBottom: DS.space.md,
                 },
               },
@@ -2605,14 +2636,14 @@ window.__ModuleLoader__.load({
                   style: {
                     ...dsControlBase, display: 'inline-flex', alignItems: 'center', gap: DS.space.xs,
                     padding: '3px 8px', borderRadius: DS.radius.sm, border: 'none', background: 'transparent',
-                    color: 'var(--dsw-alias-label-secondary)', fontSize: DS.font.sm, cursor: 'pointer',
+                    color: 'var(--ws-text-secondary)', fontSize: DS.font.sm, cursor: 'pointer',
                   },
                   title: t('workbench.cycleDomain'),
                 },
                   h(TypeGlyph, { glyph: typeDef.glyph, size: 13 }),
                   DOMAIN_LABEL.get(domain) || domain,
                   '›',
-                  h('span', { style: { color: 'var(--dsw-alias-label-primary)', fontWeight: 600 } }, typeDef.label),
+                  h('span', { style: { color: 'var(--ws-text-primary)', fontWeight: 600 } }, typeDef.label),
                 ),
                 // 域下拉（收束在面包屑后，点开切换）——简化：点击面包屑轮转域，类型用下拉
                 h('select', {
@@ -2686,11 +2717,11 @@ window.__ModuleLoader__.load({
                     h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm } },
                       batchMode ? h('input', {
                         type: 'checkbox', checked: batchSelection.includes(e.id), readOnly: true,
-                        style: { accentColor: 'var(--dsw-alias-brand-primary)', cursor: 'pointer' },
+                        style: { accentColor: 'var(--ws-accent)', cursor: 'pointer' },
                       }) : null,
                       h('div', { style: { flex: 1, minWidth: 0 } },
                         h('div', { style: { fontSize: DS.font.base, fontWeight: 600, marginBottom: DS.space.xs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, e.title),
-                        h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: DS.space.sm } },
+                        h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)', display: 'flex', gap: DS.space.sm } },
                           h('span', null, e.updatedAt.slice(0, 10)),
                           e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
                         )),
@@ -2712,7 +2743,7 @@ window.__ModuleLoader__.load({
                     style: {
                       display: 'flex', alignItems: 'center', gap: DS.space.md,
                       padding: '0 0 ' + DS.space.md + 'px',
-                      borderBottom: '1px solid var(--dsw-alias-border-l1)',
+                      borderBottom: '1px solid var(--ws-border)',
                       marginBottom: DS.space.lg,
                     },
                   },
@@ -2720,12 +2751,12 @@ window.__ModuleLoader__.load({
                       style: {
                         width: 36, height: 36, borderRadius: DS.radius.mid, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: DS.activeBg, color: 'var(--dsw-alias-brand-primary)',
+                        background: DS.activeBg, color: 'var(--ws-accent)',
                       },
                     }, h(TypeGlyph, { glyph: typeDef.glyph, size: 18 })),
                     h('div', { style: { flex: 1, minWidth: 0 } },
-                      h('div', { style: { fontSize: DS.font.lg, fontWeight: 600, color: 'var(--dsw-alias-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected.title),
-                      h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, typeDef.label + ' · ' + selected.id),
+                      h('div', { style: { fontSize: DS.font.lg, fontWeight: 600, color: 'var(--ws-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected.title),
+                      h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)' } }, typeDef.label + ' · ' + selected.id),
                     ),
                     h(GhostButton, { small: true, onClick: () => actions.selectEntity(null) }, t('detail.back')),
                   ),
@@ -2749,6 +2780,23 @@ window.__ModuleLoader__.load({
       ctx.effect(() => ctx.locale.register(NS, dictionaries), NS + ': dictionaries');
       const t = ctx.locale.bind(NS);
 
+      // S1 主题轴：把 --ws-* 变量注入插件容器（对齐 WorldSea 暗色主题：暗底 + 绿 accent），
+      // 与 dsh 宿主主题解耦；组件内一律 var(--ws-*)。
+      ctx.effect(() => {
+        const style = document.createElement('style');
+        style.dataset.worldsea = 'theme';
+        style.textContent = [
+          '[data-worldsea-ui] {',
+          ...Object.entries(WS_THEME).map(([k, v]) => `  --${k}: ${v};`),
+          '  color-scheme: dark;',
+          '}',
+          // 组件级落地：容器内所有元素的当前色默认走 ws 文字体系。
+          '[data-worldsea-ui] { color: var(--ws-text-primary); }',
+        ].join('\n');
+        document.body.appendChild(style);
+        return () => { style.remove(); };
+      }, NS + ': theme');
+
       // 全局样式注入：滚动条 / focus 可见性（作用域限定在插件容器内，卸载随 ctx.effect 清理）。
       ctx.effect(() => {
         const style = document.createElement('style');
@@ -2757,10 +2805,10 @@ window.__ModuleLoader__.load({
           // 插件容器内的滚动条：细轨 + 圆角滑块，hover 提亮（明暗主题均走 token）。
           '[data-worldsea-ui] ::-webkit-scrollbar { width: 8px; height: 8px; }',
           '[data-worldsea-ui] ::-webkit-scrollbar-track { background: transparent; }',
-          '[data-worldsea-ui] ::-webkit-scrollbar-thumb { background: var(--dsw-alias-border-l2); border-radius: 4px; }',
-          '[data-worldsea-ui] ::-webkit-scrollbar-thumb:hover { background: var(--dsw-alias-state-idle-primary); }',
+          '[data-worldsea-ui] ::-webkit-scrollbar-thumb { background: var(--ws-border-strong); border-radius: 4px; }',
+          '[data-worldsea-ui] ::-webkit-scrollbar-thumb:hover { background: var(--ws-text-muted); }',
           // 键盘导航的 focus 可见性：仅 focus-visible 显示品牌描边，不影响鼠标点击。
-          '[data-worldsea-ui] :focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }',
+          '[data-worldsea-ui] :focus-visible { outline: 2px solid var(--ws-accent); outline-offset: 1px; }',
           // 控件平滑过渡（颜色类）。
           '[data-worldsea-ui] button, [data-worldsea-ui] input, [data-worldsea-ui] select, [data-worldsea-ui] textarea { transition: ' + DS.transition + '; }',
           // 窄容器（右栏 tab）自适应：导航折叠为图标列，文字与分组标题隐藏。
@@ -2769,7 +2817,7 @@ window.__ModuleLoader__.load({
           '[data-worldsea-ui] [data-narrow="1"] .ws-nav-row { justify-content: center; padding: 7px 6px; }',
           // 详情右栏（对齐 ws-fade：进场 = 宽度+透明度+边框同时过渡；keyframes 播一次 0→560px）。
           '@keyframes ws-detail-in { from { opacity: 0; flex-basis: 0; border-left-width: 0; } to { opacity: 1; flex-basis: 560px; border-left-width: 1px; } }',
-          '[data-worldsea-ui] .ws-detail-column { animation: ws-detail-in ' + DS.durFast + ' ' + DS.ease + '; overflow: hidden; display: flex; flex-direction: column; background: var(--dsw-alias-bg-layer-1); border-left: 1px solid var(--dsw-alias-border-l1); border-radius: ' + DS.radius.md + 'px; padding: ' + DS.space.lg + 'px; }',
+          '[data-worldsea-ui] .ws-detail-column { animation: ws-detail-in ' + DS.durFast + ' ' + DS.ease + '; overflow: hidden; display: flex; flex-direction: column; background: var(--ws-bg-surface); border-left: 1px solid var(--ws-border); border-radius: ' + DS.radius.md + 'px; padding: ' + DS.space.lg + 'px; }',
           '[data-worldsea-ui] .ws-detail-column .ws-detail-scroll { flex: 1; min-height: 0; }',
         ].join('\n');
         // 标记所有渲染根（右栏 tab 与 main 各一份），样式选择器才能命中本插件容器。
