@@ -519,6 +519,15 @@ window.__ModuleLoader__.load({
           else entity.properties[key] = value;
           entity.updatedAt = new Date().toISOString();
         },
+        /** 关系属性：备注（写入 relation.properties.note；非对称边两条独立记录，各写各的）。 */
+        setRelationNote(draft, relationId, note) {
+          const rel = draft.relations.find(r => r.id === relationId);
+          if (!rel) return;
+          if (!rel.properties) rel.properties = {};
+          if (note.trim()) rel.properties.note = note;
+          else delete rel.properties.note;
+          rel.updatedAt = new Date().toISOString();
+        },
         /**
          * 建关系：有向边 source→target；非对称关系自动补逆边（pairId 互指）。
          * 对称关系（inverseType === type）只建一条边。支持内置与自定义类型。
@@ -793,12 +802,12 @@ window.__ModuleLoader__.load({
       const candidates = entities.filter(e => e.id !== selfId && (wanted.length === 0 || wanted.includes(e.type)));
       const titleOf = id => entities.find(e => e.id === id)?.title || id;
 
-      /** 本实体的关系边（显示视图）：统一按「源 —标签→ 目标」渲染。 */
+      /** 本实体的关系边（显示视图）：统一按「源 —标签→ 目标」渲染；带原 relation 供属性编辑。 */
       const rows = relations
         .filter(r => r.sourceId === selfId || r.targetId === selfId)
         .map(r => {
           const label = allDefs.find(x => x.type === r.type)?.label || r.type;
-          return { id: r.id, text: `${titleOf(r.sourceId)} —${label}→ ${titleOf(r.targetId)}` };
+          return { id: r.id, relation: r, text: `${titleOf(r.sourceId)} —${label}→ ${titleOf(r.targetId)}` };
         });
 
       return h(Card, { pad: 14 },
@@ -870,24 +879,48 @@ window.__ModuleLoader__.load({
         ) : null,
         rows.length === 0
           ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('relations.empty'))
-          : h('div', null, rows.map(row => h('div', {
-            key: row.id,
-            style: {
-              display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px',
-              fontSize: 13, borderRadius: 6, marginBottom: 2,
-              background: 'var(--dsw-alias-bg-layer-2)',
-            },
-          },
-            h('span', { style: { flex: 1 } }, row.text),
-            h('button', {
-              onClick: () => actions.removeRelation(row.id),
-              style: {
-                border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12,
-                color: 'var(--dsw-alias-state-error-primary)',
-              },
-            }, t('relations.remove')),
-          ))),
+          : h('div', null, rows.map(row => h(RelationRow, {
+            key: row.id, row, actions, t,
+          }))),
         h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)', marginTop: 8 } }, t('relations.hint')),
+      );
+    }
+
+    /** 单条关系行：文本 + 展开属性编辑（备注）+ 删除。 */
+    function RelationRow(props) {
+      const { row, actions, t } = props;
+      const [open, setOpen] = React.useState(false);
+      const note = row.relation.properties?.note || '';
+      return h('div', null,
+        h('div', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px',
+            fontSize: 13, borderRadius: 6, marginBottom: 2,
+            background: 'var(--dsw-alias-bg-layer-2)',
+          },
+        },
+          h('span', { style: { flex: 1 } }, row.text),
+          note ? h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, '📝 ' + note.slice(0, 16)) : null,
+          h('button', {
+            onClick: () => setOpen(!open),
+            style: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--dsw-alias-brand-primary)' },
+          }, open ? '▾' : t('relations.editProps')),
+          h('button', {
+            onClick: () => actions.removeRelation(row.id),
+            style: {
+              border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12,
+              color: 'var(--dsw-alias-state-error-primary)',
+            },
+          }, t('relations.remove')),
+        ),
+        open ? h('div', { style: { padding: '4px 8px 8px', display: 'flex', gap: 8, alignItems: 'center' } },
+          h('input', {
+            value: note,
+            placeholder: t('relations.notePlaceholder'),
+            onChange: e => actions.setRelationNote(row.id, e.target.value),
+            style: { ...inputStyle, flex: 1, padding: '4px 8px', fontSize: 12 },
+          }),
+        ) : null,
       );
     }
 
@@ -1723,6 +1756,8 @@ window.__ModuleLoader__.load({
       'stats.tags': '标签',
       'stats.updated': '最近更新',
       'facet.filled': '已填',
+      'relations.editProps': '属性',
+      'relations.notePlaceholder': '关系备注（如：相识于某事件）…',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -1795,6 +1830,8 @@ window.__ModuleLoader__.load({
       'stats.tags': 'Tags',
       'stats.updated': 'Last updated',
       'facet.filled': 'filled',
+      'relations.editProps': 'note',
+      'relations.notePlaceholder': 'Relation note (e.g. met during …)…',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
