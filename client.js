@@ -900,21 +900,29 @@ window.__ModuleLoader__.load({
       }, props.children);
     }
 
-    /** 卡片容器（层1 底 + 细边；可选可点击态）。 */
+    /** 卡片容器（对齐 WorldSea .entity-card：1px 独立块 + hover 强边 + active accent 双描边）。 */
     function Card(props) {
       const clickable = props.onClick !== undefined;
+      const baseBorder = clickable && props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l1)';
       return h('div', {
         onClick: props.onClick,
         style: {
           ...dsControlBase,
-          background: 'var(--dsw-alias-bg-layer-1)',
-          border: '1px solid ' + (clickable && props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l1)'),
-          borderRadius: DS.radius.md, padding: props.pad || DS.space.lg,
+          background: clickable && props.active ? DS.activeBg : 'var(--dsw-alias-bg-layer-1)',
+          border: '1px solid ' + baseBorder,
+          borderRadius: DS.radius.mid, padding: props.pad || DS.space.lg,
           ...(clickable ? { cursor: 'pointer' } : {}),
+          ...(clickable && props.active ? { boxShadow: '0 0 0 1px var(--dsw-alias-brand-primary)' } : {}),
         },
         ...(clickable ? {
-          onMouseOver: e => { e.currentTarget.style.borderColor = props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l2)'; },
-          onMouseOut: e => { e.currentTarget.style.borderColor = props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l1)'; },
+          onMouseOver: e => {
+            e.currentTarget.style.borderColor = props.active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l2)';
+            e.currentTarget.style.boxShadow = props.active ? '0 0 0 1px var(--dsw-alias-brand-primary)' : '0 1px 2px rgba(16, 24, 40, 0.05)';
+          },
+          onMouseOut: e => {
+            e.currentTarget.style.borderColor = baseBorder;
+            e.currentTarget.style.boxShadow = props.active ? '0 0 0 1px var(--dsw-alias-brand-primary)' : 'none';
+          },
         } : {}),
       }, props.children);
     }
@@ -2535,117 +2543,129 @@ window.__ModuleLoader__.load({
                 ? h(CodexView, { entities, allTypes, t })
                 : view === 'health'
                 ? h(HealthView, { entities, relations, actions, t })
-                : h('div', null,
-            // 域页签（第一级）
-            h('div', { style: { display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' } },
-              DOMAINS.map(d => {
-                const count = entities.filter(e => allTypes.find(t => t.type === e.type)?.domain === d.id).length;
-                return h('button', {
-                  key: d.id,
-                  onClick: () => actions.selectDomain(d.id),
-                  style: {
-                    padding: '3px 12px', borderRadius: DS.radius.pill, cursor: 'pointer', fontSize: DS.font.sm,
-                    border: 'none',
-                    background: d.id === domain ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-1)',
-                    color: d.id === domain ? '#fff' : 'var(--dsw-alias-label-primary)',
-                    fontWeight: d.id === domain ? 600 : 400,
-                  },
-                }, d.label + (count ? ' (' + count + ')' : ''));
-              }),
-            ),
-            // 类型切换条（第二级：当前域内的类型）＋ 自定义类型入口
-            h('div', { style: { display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' } },
-              allTypes.filter(def => def.domain === domain).map(def => h('button', {
-                key: def.type,
-                onClick: () => actions.selectType(def.type),
+                : (() => {
+            // ── 工作台：WorldSea 式随流工具条（面包屑+搜索+动作）+ 列表/详情双栏 ──
+            const workbenchBody = h('div', { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
+              // 随流工具条（对齐 ViewToolbar：面包屑 › 搜索 › 弹性 › 动作 › 新建）
+              h('div', {
                 style: {
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '4px 12px', borderRadius: DS.radius.pill, cursor: 'pointer', fontSize: DS.font.sm,
-                  border: '1px solid ' + (def.type === activeType ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-border-l1)'),
-                  background: def.type === activeType ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
-                  color: 'var(--dsw-alias-label-primary)',
+                  display: 'flex', alignItems: 'center', gap: DS.space.sm,
+                  padding: '0 ' + DS.space.md + 'px', height: 44, flexShrink: 0,
+                  background: 'var(--dsw-alias-bg-layer-1)',
+                  border: '1px solid var(--dsw-alias-border-l1)',
+                  borderRadius: DS.radius.md, marginBottom: DS.space.md,
                 },
               },
-                h(TypeGlyph, { glyph: def.glyph, size: 13 }),
-                def.label,
-                ' (' + entities.filter(e => e.type === def.type).length + ')',
-              )),
-              h(CustomTypeSection, { customEntityTypes, entities, actions, t }),
-            ),
-
-            selected
-              ? h(EntityDetail, { useStore, actions, entity: selected, fields: typeDef.fields, allRelations: relations, allEntities: entities, customRelationTypes, t, onBack: () => actions.selectEntity(null) })
-              : h('div', null,
-                h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 } },
-                  h('h3', { style: { margin: 0, fontSize: DS.font.lg } }, typeDef.label + ' · ' + t('workbench.list')),
-                  h('input', {
-                    value: search,
-                    placeholder: t('workbench.searchPlaceholder'),
-                    onChange: e => actions.setSearch(e.target.value),
-                    style: { ...inputStyle, width: 180, padding: '4px 10px', fontSize: DS.font.sm },
-                  }),
-                  h('div', { style: { flex: 1 } }),
-                  h(GhostButton, { small: true, onClick: () => actions.toggleBatchMode() }, batchMode ? t('batch.exit') : t('batch.enter')),
-                  h(GhostButton, { small: true, onClick: () => actions.createFromTemplate(typeDef.type) }, t('workbench.newFromTemplate')),
-                  h(PrimaryButton, { small: true, onClick: () => actions.create(typeDef.type, t('workbench.untitled')) }, t('workbench.new')),
-                ),
-                // 批量操作条。
-                batchMode ? h('div', {
+                // 面包屑：域 › 类型
+                h('button', {
+                  onClick: () => { const cur = DOMAINS.findIndex(x => x.id === domain); const next = DOMAINS[(cur + 1) % DOMAINS.length]; actions.selectDomain(next.id); },
                   style: {
-                    display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-                    padding: '7px 12px', borderRadius: DS.radius.md, flexWrap: 'wrap',
-                    background: 'var(--dsw-alias-bg-layer-2)', fontSize: DS.font.md,
+                    ...dsControlBase, display: 'inline-flex', alignItems: 'center', gap: DS.space.xs,
+                    padding: '3px 8px', borderRadius: DS.radius.sm, border: 'none', background: 'transparent',
+                    color: 'var(--dsw-alias-label-secondary)', fontSize: DS.font.sm, cursor: 'pointer',
+                  },
+                  title: t('workbench.cycleDomain'),
+                },
+                  h(TypeGlyph, { glyph: typeDef.glyph, size: 13 }),
+                  DOMAIN_LABEL.get(domain) || domain,
+                  '›',
+                  h('span', { style: { color: 'var(--dsw-alias-label-primary)', fontWeight: 600 } }, typeDef.label),
+                ),
+                // 域下拉（收束在面包屑后，点开切换）——简化：点击面包屑轮转域，类型用下拉
+                h('select', {
+                  value: activeType,
+                  onChange: e => actions.selectType(e.target.value),
+                  style: { ...inputStyle, width: 'auto', padding: '3px 8px', fontSize: DS.font.sm },
+                },
+                  allTypes.map(def => h('option', { key: def.type, value: def.type },
+                    (DOMAIN_LABEL.get(def.domain) || def.domain) + ' · ' + def.label + ' (' + entities.filter(e => e.type === def.type).length + ')'))),
+                h('input', {
+                  value: search,
+                  placeholder: t('workbench.searchPlaceholder'),
+                  onChange: e => actions.setSearch(e.target.value),
+                  style: { ...inputStyle, width: 180, padding: '4px 10px', fontSize: DS.font.sm },
+                }),
+                h('div', { style: { flex: 1 } }),
+                h(GhostButton, { small: true, onClick: () => actions.toggleBatchMode() }, batchMode ? t('batch.exit') : t('batch.enter')),
+                h(GhostButton, { small: true, onClick: () => actions.createFromTemplate(typeDef.type) }, t('workbench.newFromTemplate')),
+                h(PrimaryButton, { small: true, onClick: () => actions.create(typeDef.type, t('workbench.untitled')) }, t('workbench.new') + ' ' + typeDef.label),
+              ),
+              h(CustomTypeSection, { customEntityTypes, entities, actions, t }),
+              // 批量操作条。
+              batchMode ? h('div', {
+                style: {
+                  display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.md,
+                  padding: '7px 12px', borderRadius: DS.radius.mid, flexWrap: 'wrap',
+                  background: DS.activeBg, fontSize: DS.font.md,
+                },
+              },
+                h('span', { style: { fontWeight: 600 } }, t('batch.selected').replace('{n}', String(batchSelection.length))),
+                h('input', {
+                  ref: batchTagRef,
+                  placeholder: t('batch.tagPlaceholder'),
+                  onKeyDown: e => {
+                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                      actions.batchAddTag(e.currentTarget.value);
+                      e.currentTarget.value = '';
+                    }
+                  },
+                  style: { ...inputStyle, width: 150, padding: '4px 8px', fontSize: DS.font.sm },
+                }),
+                h(GhostButton, { small: true, onClick: () => { const el = batchTagRef.current; if (el && el.value.trim()) { actions.batchAddTag(el.value); el.value = ''; } } }, t('batch.applyTag')),
+                h(GhostButton, {
+                  small: true,
+                  onClick: () => {
+                    if (batchSelection.length >= 2 && window.confirm(t('batch.mergeConfirm').replace('{n}', String(batchSelection.length)))) actions.batchMerge();
+                  },
+                }, t('batch.merge')),
+                h(GhostButton, {
+                  small: true,
+                  onClick: () => {
+                    if (batchSelection.length && window.confirm(t('batch.deleteConfirm').replace('{n}', String(batchSelection.length)))) actions.batchRemove();
+                  },
+                }, t('batch.delete')),
+              ) : null,
+              // 列表网格。
+              list.length === 0
+                ? h(EmptyState, null, t('workbench.empty'))
+                : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: DS.space.md, alignContent: 'start' } },
+                  list.map(e => h(Card, {
+                    key: e.id, pad: DS.space.md,
+                    active: (batchMode && batchSelection.includes(e.id)) || (!batchMode && selectedId === e.id),
+                    onClick: () => batchMode ? actions.toggleBatchItem(e.id) : actions.selectEntity(e.id),
+                  },
+                    h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm } },
+                      batchMode ? h('input', {
+                        type: 'checkbox', checked: batchSelection.includes(e.id), readOnly: true,
+                        style: { accentColor: 'var(--dsw-alias-brand-primary)', cursor: 'pointer' },
+                      }) : null,
+                      h('div', { style: { flex: 1, minWidth: 0 } },
+                        h('div', { style: { fontSize: DS.font.base, fontWeight: 600, marginBottom: DS.space.xs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, e.title),
+                        h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: DS.space.sm } },
+                          h('span', null, e.updatedAt.slice(0, 10)),
+                          e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
+                        )),
+                    ),
+                  ))),
+            );
+            // 详情右栏（对齐 WorldSea detail-carrier="column"：选中实体 → 列表旁开 560px 面板）。
+            return selected
+              ? h('div', { style: { flex: 1, minWidth: 0, display: 'flex', gap: DS.space.md, minHeight: 0 } },
+                h('div', { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } }, workbenchBody),
+                h('div', {
+                  style: {
+                    flex: '0 0 560px', width: 560, boxSizing: 'border-box',
+                    overflowY: 'auto', alignSelf: 'stretch',
+                    background: 'var(--dsw-alias-bg-layer-1)',
+                    borderLeft: '1px solid var(--dsw-alias-border-l1)',
+                    borderRadius: DS.radius.md, padding: DS.space.lg,
                   },
                 },
-                  h('span', { style: { fontWeight: 600 } }, t('batch.selected').replace('{n}', String(batchSelection.length))),
-                  h('input', {
-                    ref: batchTagRef,
-                    placeholder: t('batch.tagPlaceholder'),
-                    onKeyDown: e => {
-                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                        actions.batchAddTag(e.currentTarget.value);
-                        e.currentTarget.value = '';
-                      }
-                    },
-                    style: { ...inputStyle, width: 150, padding: '4px 8px', fontSize: DS.font.sm },
-                  }),
-                  h(GhostButton, { small: true, onClick: () => { const el = batchTagRef.current; if (el && el.value.trim()) { actions.batchAddTag(el.value); el.value = ''; } } }, t('batch.applyTag')),
-                  h(GhostButton, {
-                    small: true,
-                    onClick: () => {
-                      if (batchSelection.length >= 2 && window.confirm(t('batch.mergeConfirm').replace('{n}', String(batchSelection.length)))) actions.batchMerge();
-                    },
-                  }, t('batch.merge')),
-                  h(GhostButton, {
-                    small: true,
-                    onClick: () => {
-                      if (batchSelection.length && window.confirm(t('batch.deleteConfirm').replace('{n}', String(batchSelection.length)))) actions.batchRemove();
-                    },
-                  }, t('batch.delete')),
-                ) : null,
-                list.length === 0
-                  ? h(EmptyState, null, t('workbench.empty'))
-                  : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: DS.space.md } },
-                    list.map(e => h(Card, {
-                      key: e.id, pad: DS.space.md,
-                      active: batchMode && batchSelection.includes(e.id),
-                      onClick: () => batchMode ? actions.toggleBatchItem(e.id) : actions.selectEntity(e.id),
-                    },
-                      h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm } },
-                        batchMode ? h('input', {
-                          type: 'checkbox', checked: batchSelection.includes(e.id), readOnly: true,
-                          style: { accentColor: 'var(--dsw-alias-brand-primary)', cursor: 'pointer' },
-                        }) : null,
-                        h('div', { style: { flex: 1, minWidth: 0 } },
-                          h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600, marginBottom: DS.space.xs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, e.title),
-                          h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: DS.space.sm } },
-                            h('span', null, e.updatedAt.slice(0, 10)),
-                            e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
-                          )),
-                      ),
-                    ))),
-              ),
-          ),
+                  h(EntityDetail, { useStore, actions, entity: selected, fields: typeDef.fields, allRelations: relations, allEntities: entities, customRelationTypes, t, onBack: () => actions.selectEntity(null) }),
+                ),
+              )
+              : workbenchBody;
+          })(),
       ));
     }
 
@@ -2742,6 +2762,7 @@ window.__ModuleLoader__.load({
       'tab.codex': '设定集',
       'tab.writing': '写作',
       'tab.manuscript': '手稿',
+      'workbench.cycleDomain': '点击轮转域',
       'tab.portal': '门户',
       'nav.create': '创作',
       'nav.visual': '可视化',
@@ -2875,6 +2896,7 @@ window.__ModuleLoader__.load({
       'tab.codex': 'Codex',
       'tab.writing': 'Writing',
       'tab.manuscript': 'Manuscript',
+      'workbench.cycleDomain': 'Click to cycle domain',
       'tab.portal': 'Portal',
       'nav.create': 'Create',
       'nav.visual': 'Visualize',
