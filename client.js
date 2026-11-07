@@ -1050,6 +1050,23 @@ window.__ModuleLoader__.load({
           return h('svg', common,
             h('rect', { x: 6, y: 3, width: 12, height: 18 }),
             h('path', { d: 'M9 7h6M9 11h6M9 15h4' }));
+        case 'grid':
+          return h('svg', common,
+            h('rect', { x: 4, y: 4, width: 7, height: 7 }),
+            h('rect', { x: 13, y: 4, width: 7, height: 7 }),
+            h('rect', { x: 4, y: 13, width: 7, height: 7 }),
+            h('rect', { x: 13, y: 13, width: 7, height: 7 }));
+        case 'graph':
+          return h('svg', common,
+            h('circle', { cx: 6, cy: 6, r: 2.5 }),
+            h('circle', { cx: 18, cy: 8, r: 2.5 }),
+            h('circle', { cx: 12, cy: 18, r: 2.5 }),
+            h('path', { d: 'M8 7l7.5.7M7.5 8.3 11 15.6M16.8 10.2 13 15.7' }));
+        case 'globe':
+          return h('svg', common,
+            h('circle', { cx: 12, cy: 12, r: 8.5 }),
+            h('ellipse', { cx: 12, cy: 12, rx: 3.8, ry: 8.5 }),
+            h('path', { d: 'M3.8 9.5h16.4M3.8 14.5h16.4' }));
         default:
           return h('svg', common, h('circle', { cx: 12, cy: 12, r: 8 }));
       }
@@ -2375,13 +2392,6 @@ window.__ModuleLoader__.load({
         return hits.length ? [{ entity: e, where: hits[0] }] : [];
       });
 
-      /** 页签按钮公共样式。 */
-      const pill = (active) => ({
-        padding: '5px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 13,
-        background: active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-1)',
-        color: active ? '#fff' : 'var(--dsw-alias-label-primary)',
-      });
-
       /** 统计带：实体总数 / 关系总数 / 标签数 / 最近更新。 */
       const tagCount = new Set(entities.flatMap(e => e.tags)).size;
       const latest = entities.reduce((acc, e) => (e.updatedAt > acc ? e.updatedAt : acc), '');
@@ -2392,31 +2402,79 @@ window.__ModuleLoader__.load({
         { label: t('stats.updated'), value: latest ? latest.slice(0, 10) : '—' },
       ];
 
-      return h('div', { style: { height: '100%', overflowY: 'auto', boxSizing: 'border-box', padding: 20 } },
-        // 统计带。
-        h('div', { style: { display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' } },
-          stats.map(s => h('div', {
-            key: s.label,
-            style: {
-              flex: '1 1 120px', padding: '8px 14px', borderRadius: 10,
-              background: 'var(--dsw-alias-bg-layer-1)', border: '1px solid var(--dsw-alias-border-l1)',
-            },
+      /** 面板内导航项（分组：创作 / 可视 / 维护）。 */
+      const NAV_GROUPS = [
+        { id: 'create', label: t('nav.create'), items: ['workbench', 'writing', 'manuscript'] },
+        { id: 'visual', label: t('nav.visual'), items: ['graph', 'timeline', 'codex'] },
+        { id: 'maintain', label: t('nav.maintain'), items: ['health', 'portal'] },
+      ];
+      const NAV_GLYPHS = { workbench: 'grid', writing: 'note', manuscript: 'manuscript', graph: 'graph', timeline: 'clock', codex: 'book', health: 'shield', portal: 'globe' };
+      /** 导航行（图标 + 文字，选中态品牌左条）。 */
+      const navRow = (id) => {
+        const active = view === id;
+        return h('div', {
+          key: id,
+          onClick: () => actions.setView(id),
+          style: {
+            ...dsControlBase,
+            display: 'flex', alignItems: 'center', gap: DS.space.sm,
+            padding: '7px 10px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md,
+            background: active ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+            color: active ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)',
+            fontWeight: active ? 600 : 400,
+            borderLeft: '3px solid ' + (active ? 'var(--dsw-alias-brand-primary)' : 'transparent'),
           },
-            h('div', { style: { fontSize: 18, fontWeight: 700, color: 'var(--dsw-alias-label-primary)' } }, s.value),
-            h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, s.label),
-          ))),
-        // 顶部页签：工作台 / 图谱 / 时间线 / 门户
-        h('div', { style: { display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' } },
-          h('button', { onClick: () => actions.setView('workbench'), style: pill(view === 'workbench') }, t('tab.workbench')),
-          h('button', { onClick: () => actions.setView('writing'), style: pill(view === 'writing') }, t('tab.writing')),
-          h('button', { onClick: () => actions.setView('manuscript'), style: pill(view === 'manuscript') }, t('tab.manuscript')),
-          h('button', { onClick: () => actions.setView('graph'), style: pill(view === 'graph') }, t('tab.graph')),
-          h('button', { onClick: () => actions.setView('timeline'), style: pill(view === 'timeline') }, t('tab.timeline')),
-          h('button', { onClick: () => actions.setView('codex'), style: pill(view === 'codex') }, t('tab.codex')),
-          h('button', { onClick: () => actions.setView('health'), style: pill(view === 'health') }, t('tab.health')),
-          h('button', { onClick: () => actions.setView('portal'), style: pill(view === 'portal') }, t('tab.portal')),
-        ),
+          onMouseOver: e => { if (!active) e.currentTarget.style.background = DS.hoverBg; },
+          onMouseOut: e => { if (!active) e.currentTarget.style.background = 'transparent'; },
+        },
+          h(TypeGlyph, { glyph: NAV_GLYPHS[id], size: 14 }),
+          h('span', { style: { flex: 1 } }, t('tab.' + id)),
+        );
+      };
 
+      /** 面板骨架：左侧导航 + 右侧内容（各视图自己滚动）。 */
+      const shell = (content) => h('div', {
+        style: { height: '100%', display: 'flex', boxSizing: 'border-box', overflow: 'hidden' },
+      },
+        // 导航侧栏
+        h('div', {
+          style: {
+            width: DS.navWidth, flexShrink: 0, boxSizing: 'border-box',
+            padding: DS.space.lg + 'px ' + DS.space.md + 'px',
+            overflowY: 'auto',
+            borderRight: '1px solid var(--dsw-alias-border-l1)',
+          },
+        },
+          // 顶部品牌行
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.lg } },
+            WorldIcon({ size: 22 }),
+            h('div', { style: { fontSize: DS.font.lg, fontWeight: 700 } }, 'WorldSea'),
+          ),
+          NAV_GROUPS.map(g => h('div', { key: g.id, style: { marginBottom: DS.space.md } },
+            h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-state-idle-primary)', letterSpacing: '0.06em', margin: '0 0 ' + DS.space.xs + 'px ' + DS.space.sm + 'px' } }, g.label.toUpperCase()),
+            g.items.map(navRow),
+          )),
+        ),
+        // 内容区（仅当前视图滚动）
+        h('div', { style: { flex: 1, minWidth: 0, overflowY: 'auto', padding: DS.space.xl } }, content),
+      );
+
+      return shell(h('div', null,
+        // 统计带（仅工作台视图显示）。
+        view === 'workbench'
+          ? h('div', { style: { display: 'flex', gap: DS.space.md, marginBottom: DS.space.lg, flexWrap: 'wrap' } },
+            stats.map(s => h('div', {
+              key: s.label,
+              style: {
+                flex: '1 1 120px', padding: DS.space.sm + 'px ' + DS.space.lg + 'px',
+                borderRadius: DS.radius.md, background: 'var(--dsw-alias-bg-layer-1)',
+                border: '1px solid var(--dsw-alias-border-l1)',
+              },
+            },
+              h('div', { style: { fontSize: DS.font.xl, fontWeight: 700, color: 'var(--dsw-alias-label-primary)' } }, s.value),
+              h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, s.label),
+            )))
+          : null,
         // 全库搜索：跨类型；有关键词且不在详情态时，在列表上方出全库命中区。
         view === 'workbench' && kw && !selected
           ? h('div', { style: { marginBottom: 14 } },
@@ -2575,7 +2633,7 @@ window.__ModuleLoader__.load({
                     ))),
               ),
           ),
-      );
+      ));
     }
 
     // ─────────────────────────────────────────────
@@ -2640,6 +2698,9 @@ window.__ModuleLoader__.load({
       'tab.writing': '写作',
       'tab.manuscript': '手稿',
       'tab.portal': '门户',
+      'nav.create': '创作',
+      'nav.visual': '可视化',
+      'nav.maintain': '维护',
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
       'graph.filter': '只看关系',
       'graph.allRelations': '全部关系',
@@ -2770,6 +2831,9 @@ window.__ModuleLoader__.load({
       'tab.writing': 'Writing',
       'tab.manuscript': 'Manuscript',
       'tab.portal': 'Portal',
+      'nav.create': 'Create',
+      'nav.visual': 'Visualize',
+      'nav.maintain': 'Maintain',
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
       'graph.filter': 'Show relation',
       'graph.allRelations': 'All relations',
