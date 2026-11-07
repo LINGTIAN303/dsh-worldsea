@@ -2870,17 +2870,27 @@ window.__ModuleLoader__.load({
                     active: (batchMode && batchSelection.includes(e.id)) || (!batchMode && selectedId === e.id),
                     onClick: () => batchMode ? actions.toggleBatchItem(e.id) : actions.selectEntity(e.id),
                   },
-                    h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm } },
+                    // 卡片头（对齐 .card-header：类型图标 + 名称 + 副标题字段值）。
+                    h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: DS.space.sm } },
                       batchMode ? h('input', {
                         type: 'checkbox', checked: batchSelection.includes(e.id), readOnly: true,
-                        style: { accentColor: 'var(--ws-accent)', cursor: 'pointer' },
+                        style: { accentColor: 'var(--ws-accent)', cursor: 'pointer', marginTop: 2 },
                       }) : null,
+                      h('div', {
+                        style: {
+                          width: 26, height: 26, borderRadius: DS.radius.pill, flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'var(--ws-bg-muted)', color: 'var(--ws-text-secondary)',
+                        },
+                      }, h(TypeGlyph, { glyph: typeDef.glyph, size: 13 })),
                       h('div', { style: { flex: 1, minWidth: 0 } },
-                        h('div', { style: { fontSize: DS.font.base, fontWeight: 600, marginBottom: DS.space.xs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, e.title),
-                        h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)', display: 'flex', gap: DS.space.sm } },
-                          h('span', null, e.updatedAt.slice(0, 10)),
-                          e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
-                        )),
+                        h('div', { style: { fontSize: DS.font.base, fontWeight: 600, color: 'var(--ws-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, e.title),
+                        // 副标题：cardSubtitle 语义 = 首个非空文本字段。
+                        (() => {
+                          const sub = typeDef.fields.find(f => f.fieldType === 'text' && e.properties[f.key]);
+                          return sub ? h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, String(e.properties[sub.key])) : null;
+                        })(),
+                      ),
                     ),
                   ))),
             );
