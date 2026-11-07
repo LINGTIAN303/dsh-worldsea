@@ -282,6 +282,12 @@ window.__ModuleLoader__.load({
     const DOMAIN_LABEL = new Map(DOMAINS.map(d => [d.id, d.label]));
 
     /**
+     * 用户自定义实体类型（对齐 WorldSea EntityTypeSchema：typeKey + label + fields）。
+     * 与内置类型合并生效；实例实体直接存在 entities 里（type 键区分），无需迁移。
+     */
+    const allEntityTypes = (customs) => customs && customs.length ? [...ENTITY_TYPES, ...customs] : ENTITY_TYPES;
+
+    /**
      * 实体示例模板（对齐 WorldSea templates 思路：每类型一份示例预填，快速上手）。
      * createFromTemplate 时合并进 properties，标题加「示例」前缀可改。
      */
@@ -398,6 +404,8 @@ window.__ModuleLoader__.load({
         relations: [],
         /** 用户自定义关系类型（对齐 WorldSea isCustom；与内置 RELATION_TYPES 合并生效）。 */
         customRelationTypes: [],
+        /** 用户自定义实体类型（对齐 WorldSea EntityTypeSchema.customFields；与内置 ENTITY_TYPES 合并生效）。 */
+        customEntityTypes: [],
         view: 'workbench',
         activeDomain: 'life',
         activeType: 'character',
@@ -666,11 +674,37 @@ window.__ModuleLoader__.load({
             }
           }
         },
-        /** 清空全部创作数据（实体 + 关系 + 自定义关系类型）。 */
+        /** 新增自定义实体类型。 */
+        addCustomEntityType(draft, def) {
+          if (!def || !def.type || !def.label) return;
+          const type = def.type.trim();
+          if (!/^[a-z][a-z0-9_]*$/.test(type)) return;
+          if (allEntityTypes(draft.customEntityTypes).some(t => t.type === type)) return;
+          const fields = (def.fields || [])
+            .filter(f => f.key && f.label)
+            .map(f => ({ key: f.key.trim(), label: f.label.trim(), fieldType: ['text', 'textarea', 'number', 'select'].includes(f.fieldType) ? f.fieldType : 'text', options: Array.isArray(f.options) ? f.options : undefined }));
+          draft.customEntityTypes.push({ type, label: def.label.trim(), domain: DOMAINS.some(d => d.id === def.domain) ? def.domain : 'knowledge', fields, glyph: 'cube', isCustom: true });
+        },
+        /** 删除自定义实体类型：其下实体一并删除（含关系）。 */
+        removeCustomEntityType(draft, type) {
+          if (!draft.customEntityTypes.some(t => t.type === type)) return;
+          const doomed = new Set(draft.entities.filter(e => e.type === type).map(e => e.id));
+          draft.entities = draft.entities.filter(e => !doomed.has(e.id));
+          draft.relations = draft.relations.filter(r => !doomed.has(r.sourceId) && !doomed.has(r.targetId));
+          draft.customEntityTypes = draft.customEntityTypes.filter(t => t.type !== type);
+          if (draft.activeType === type) {
+            const first = ENTITY_TYPES[0];
+            draft.activeType = first.type;
+            draft.activeDomain = first.domain;
+            draft.selectedId = null; draft.editing = false; draft.draft = null;
+          }
+        },
+        /** 清空全部创作数据（实体 + 关系 + 自定义类型）。 */
         clearAll(draft) {
           draft.entities = [];
           draft.relations = [];
           draft.customRelationTypes = [];
+          draft.customEntityTypes = [];
           draft.selectedId = null;
           draft.editing = false;
           draft.draft = null;
@@ -834,6 +868,10 @@ window.__ModuleLoader__.load({
           return h('svg', common,
             h('path', { d: 'M12 3l7 3v5c0 5-3.2 8.2-7 10-3.8-1.8-7-5-7-10V6l7-3z' }),
             h('path', { d: 'M9 12l2 2 4-4' }));
+        case 'cube':
+          return h('svg', common,
+            h('path', { d: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z' }),
+            h('path', { d: 'M4 7.5 12 12l8-4.5M12 12v9' }));
         default:
           return h('svg', common, h('circle', { cx: 12, cy: 12, r: 8 }));
       }
@@ -1663,6 +1701,70 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** 自定义实体类型管理弹层：新建（type/label/字段行）+ 清单删除。 */
+    function CustomTypeSection(props) {
+      const { customEntityTypes, entities, actions, t } = props;
+      const [open, setOpen] = React.useState(false);
+      const [type, setType] = React.useState('');
+      const [label, setLabel] = React.useState('');
+      const [domain, setDomain] = React.useState('knowledge');
+      const [fieldLines, setFieldLines] = React.useState('');
+      /** 字段行格式：key|label|text|选项1,选项2（每行一条）。 */
+      const parseFields = () => fieldLines.split('\n').map(line => {
+        const parts = line.split('|').map(s => s.trim());
+        if (!parts[0] || !parts[1]) return null;
+        return { key: parts[0], label: parts[1], fieldType: parts[2] || 'text', options: parts[3] ? parts[3].split(',').map(s => s.trim()).filter(Boolean) : undefined };
+      }).filter(Boolean);
+      return h('div', null,
+        h('button', {
+          onClick: () => setOpen(!open),
+          style: {
+            padding: '3px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12,
+            border: '1px dashed var(--dsw-alias-border-l2)', background: 'transparent',
+            color: 'var(--dsw-alias-label-secondary)',
+          },
+        }, open ? t('customType.close') : t('customType.open')),
+        open ? h(Card, { pad: 12 },
+          h('div', { style: { fontSize: 13, fontWeight: 600, marginBottom: 8 } }, t('customType.title')),
+          h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 } },
+            h('input', { value: type, placeholder: t('customType.key'), onChange: e => setType(e.target.value), style: { ...inputStyle, width: 120 } }),
+            h('input', { value: label, placeholder: t('customType.label'), onChange: e => setLabel(e.target.value), style: { ...inputStyle, width: 100 } }),
+            h('select', { value: domain, onChange: e => setDomain(e.target.value), style: { ...inputStyle, width: 110 } },
+              DOMAINS.map(d => h('option', { key: d.id, value: d.id }, d.label))),
+            h(PrimaryButton, {
+              small: true,
+              onClick: () => {
+                actions.addCustomEntityType({ type, label, domain, fields: parseFields() });
+                setType(''); setLabel(''); setFieldLines('');
+              },
+            }, t('customType.add')),
+          ),
+          h('textarea', {
+            value: fieldLines,
+            placeholder: t('customType.fieldsHint'),
+            rows: 3,
+            onChange: e => setFieldLines(e.target.value),
+            style: { ...inputStyle, marginBottom: 8, fontSize: 12, fontFamily: 'ui-monospace, monospace' },
+          }),
+          customEntityTypes.length ? h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+            customEntityTypes.map(ct => h('span', {
+              key: ct.type,
+              style: {
+                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px',
+                borderRadius: 999, fontSize: 12, background: 'var(--dsw-alias-bg-layer-2)',
+                border: '1px solid var(--dsw-alias-border-l1)',
+              },
+            },
+              ct.label + '（' + ct.type + ' · ' + entities.filter(e => e.type === ct.type).length + '）',
+              h('button', {
+                onClick: () => { if (window.confirm(t('customType.removeConfirm').replace('{label}', ct.label))) actions.removeCustomEntityType(ct.type); },
+                style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-state-error-primary)', padding: 0, fontSize: 11 },
+              }, '×'),
+            ))) : null,
+        ) : null,
+      );
+    }
+
     /** 工作台主体（左栏 main 与右栏 tab 共用组件）。 */
     function Workbench(props) {
       const { useStore, actions, t } = props;
@@ -1677,8 +1779,10 @@ window.__ModuleLoader__.load({
       const customRelationTypes = useStore(s => s.customRelationTypes || []);
       const batchMode = useStore(s => s.batchMode);
       const batchSelection = useStore(s => s.batchSelection || []);
+      const customEntityTypes = useStore(s => s.customEntityTypes || []);
+      const allTypes = allEntityTypes(customEntityTypes);
 
-      const typeDef = ENTITY_TYPES.find(x => x.type === activeType) || ENTITY_TYPES[0];
+      const typeDef = allTypes.find(x => x.type === activeType) || allTypes[0];
       // 旧持久化数据可能缺 activeDomain：按当前类型回推。
       const domain = activeDomain || typeDef.domain;
       const kw = search.trim();
@@ -1698,7 +1802,7 @@ window.__ModuleLoader__.load({
         if (e.tags.some(tag => tag.includes(kw))) hits.push(t('search.inTags'));
         for (const [key, value] of Object.entries(e.properties)) {
           if (typeof value === 'string' && value.includes(kw)) {
-            const field = ENTITY_TYPES.find(x => x.type === e.type)?.fields.find(f => f.key === key);
+            const field = allTypes.find(x => x.type === e.type)?.fields.find(f => f.key === key);
             hits.push((field?.label || key) + ': ' + value.slice(0, 20));
             break;
           }
@@ -1763,10 +1867,10 @@ window.__ModuleLoader__.load({
                       background: 'var(--dsw-alias-bg-layer-2)',
                     },
                   },
-                    h(TypeGlyph, { glyph: ENTITY_TYPES.find(x => x.type === e.type)?.glyph, size: 12 }),
+                    h(TypeGlyph, { glyph: allTypes.find(x => x.type === e.type)?.glyph, size: 12 }),
                     h('span', { style: { fontWeight: 600 } }, e.title),
                     h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
-                      (ENTITY_TYPES.find(x => x.type === e.type)?.label || e.type) + ' · ' + where),
+                      (allTypes.find(x => x.type === e.type)?.label || e.type) + ' · ' + where),
                   )))))
           : null,
 
@@ -1782,7 +1886,7 @@ window.__ModuleLoader__.load({
             // 域页签（第一级）
             h('div', { style: { display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' } },
               DOMAINS.map(d => {
-                const count = entities.filter(e => ENTITY_TYPES.find(t => t.type === e.type)?.domain === d.id).length;
+                const count = entities.filter(e => allTypes.find(t => t.type === e.type)?.domain === d.id).length;
                 return h('button', {
                   key: d.id,
                   onClick: () => actions.selectDomain(d.id),
@@ -1796,9 +1900,9 @@ window.__ModuleLoader__.load({
                 }, d.label + (count ? ' (' + count + ')' : ''));
               }),
             ),
-            // 类型切换条（第二级：当前域内的类型）
-            h('div', { style: { display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' } },
-              ENTITY_TYPES.filter(def => def.domain === domain).map(def => h('button', {
+            // 类型切换条（第二级：当前域内的类型）＋ 自定义类型入口
+            h('div', { style: { display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' } },
+              allTypes.filter(def => def.domain === domain).map(def => h('button', {
                 key: def.type,
                 onClick: () => actions.selectType(def.type),
                 style: {
@@ -1813,6 +1917,7 @@ window.__ModuleLoader__.load({
                 def.label,
                 ' (' + entities.filter(e => e.type === def.type).length + ')',
               )),
+              h(CustomTypeSection, { customEntityTypes, entities, actions, t }),
             ),
 
             selected
@@ -1992,6 +2097,14 @@ window.__ModuleLoader__.load({
       'health.clean': '检查通过：无问题。',
       'health.summary': '悬挂关系 {d} · 重复标题 {dup} · 空标题 {e}',
       'health.pruneDangling': '清理悬挂关系（{n}）',
+      'customType.open': '＋自定义类型',
+      'customType.close': '收起',
+      'customType.title': '自定义实体类型（typeKey 用小写英文；字段每行一条：键|显示名|text/textarea/number/select|选项1,选项2）',
+      'customType.key': '类型键',
+      'customType.label': '显示名',
+      'customType.add': '添加类型',
+      'customType.fieldsHint': '字段行示例：\norigin|出身地|text\ntier|阶级|select|下位,中位,上位',
+      'customType.removeConfirm': '删除类型「{label}」会一并删除其下全部实体与关系，确定？',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -2082,6 +2195,14 @@ window.__ModuleLoader__.load({
       'health.clean': 'All clean.',
       'health.summary': 'Dangling {d} · Duplicate titles {dup} · Empty titles {e}',
       'health.pruneDangling': 'Prune dangling relations ({n})',
+      'customType.open': '+Custom type',
+      'customType.close': 'Close',
+      'customType.title': 'Custom entity types (ascii typeKey; one field per line: key|label|text/textarea/number/select|opt1,opt2)',
+      'customType.key': 'Type key',
+      'customType.label': 'Label',
+      'customType.add': 'Add type',
+      'customType.fieldsHint': 'Field line examples:\norigin|Birthplace|text\ntier|Tier|select|low,mid,high',
+      'customType.removeConfirm': 'Deleting "{label}" also deletes all its entities and relations. Continue?',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
