@@ -2626,9 +2626,10 @@ window.__ModuleLoader__.load({
         { id: 'maintain', label: t('nav.maintain'), items: ['health', 'portal'] },
       ];
       const NAV_GLYPHS = { home: 'globe', workbench: 'grid', writing: 'note', manuscript: 'manuscript', graph: 'graph', timeline: 'clock', codex: 'book', health: 'shield', portal: 'globe' };
-      /** 导航行（图标 + 文字；active = accent-soft 弱底 + accent 字，对齐 WorldSea .ws-sn-view.active）。 */
+      /** 导航行（对齐 SproutList .ws-sn-view：图标+文字+右计数徽标；active accent-soft 底 + accent 字）。 */
       const navRow = (id) => {
         const active = view === id;
+        const badge = id === 'workbench' ? entities.length : (id === 'writing' ? entities.filter(e => e.type === 'outline_node' || e.type === 'notebook').length : 0);
         return h('div', {
           key: id,
           className: 'ws-nav-row',
@@ -2646,6 +2647,12 @@ window.__ModuleLoader__.load({
         },
           h(TypeGlyph, { glyph: NAV_GLYPHS[id], size: 14 }),
           h('span', { className: 'ws-nav-label', style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, t('tab.' + id)),
+          badge > 0 ? h('span', {
+            style: {
+              fontSize: DS.font.x2s, color: active ? 'var(--ws-accent)' : 'var(--ws-text-muted)',
+              fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+            },
+          }, String(badge)) : null,
         );
       };
 
@@ -2668,24 +2675,44 @@ window.__ModuleLoader__.load({
         },
         style: { height: '100%', display: 'flex', boxSizing: 'border-box', overflow: 'hidden' },
       },
-        // 导航侧栏（窄模式：仅图标列）
+        // 导航侧栏（对齐 WorldSea ws-sn-sidebar：顶部品牌行 + 芽清单 + 底部省略号）
         h('div', {
           style: {
             width: DS.navWidth, flexShrink: 0, boxSizing: 'border-box',
-            padding: DS.space.lg + 'px ' + DS.space.md + 'px',
-            overflowY: 'auto',
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden',
             borderRight: '1px solid var(--ws-border)',
           },
         },
-          // 顶部品牌行（窄模式隐藏文字由 CSS 处理——见全局样式 [data-narrow="1"] 规则）
-          h('div', { className: 'ws-nav-brand', style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.lg } },
-            WorldIcon({ size: 22 }),
-            h('div', { className: 'ws-nav-label', style: { fontSize: DS.font.lg, fontWeight: 700 } }, 'WorldSea'),
+          // 顶部品牌行（星标 + WorldEye 品牌字标）
+          h('div', {
+            style: {
+              display: 'flex', alignItems: 'center', gap: DS.space.sm,
+              padding: '0 ' + DS.space.md + 'px', height: 44, flexShrink: 0,
+              borderBottom: '1px solid var(--ws-border)',
+            },
+          },
+            h('span', { style: { color: 'var(--ws-text-muted)', fontSize: DS.font.md, cursor: 'pointer' }, title: t('nav.pin') }, '☆'),
+            h('div', { className: 'ws-nav-label', style: { flex: 1, display: 'flex', alignItems: 'center', gap: DS.space.xs, fontSize: DS.font.base, fontWeight: 700, color: 'var(--ws-text-primary)' } },
+              WorldIcon({ size: 16 }),
+              'WorldSea',
+            ),
           ),
-          NAV_GROUPS.map(g => h('div', { key: g.id, className: 'ws-nav-group', style: { marginBottom: DS.space.md } },
-            h('div', { className: 'ws-nav-label', style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)', letterSpacing: '0.06em', margin: '0 0 ' + DS.space.xs + 'px ' + DS.space.sm + 'px' } }, g.label.toUpperCase()),
-            g.items.map(navRow),
-          )),
+          // 芽清单（对齐 SproutList：图标+文字+计数徽标，active accent-soft）
+          h('div', { className: 'ws-nav-scroll', style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: DS.space.sm } },
+            NAV_GROUPS.map(g => h('div', { key: g.id, className: 'ws-nav-group', style: { marginBottom: DS.space.md } },
+              h('div', { className: 'ws-nav-label', style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)', letterSpacing: '0.06em', margin: '0 0 ' + DS.space.xs + 'px ' + DS.space.sm + 'px' } }, g.label.toUpperCase()),
+              g.items.map(navRow),
+            )),
+          ),
+          // 底部：更多（省略号，对齐 AppMenu 位）
+          h('div', {
+            style: {
+              flexShrink: 0, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderTop: '1px solid var(--ws-border)', color: 'var(--ws-text-muted)', cursor: 'pointer',
+            },
+            onClick: () => actions.setView('portal'),
+          }, '···'),
         ),
         // 内容区（仅当前视图滚动）
         h('div', { style: { flex: 1, minWidth: 0, overflowY: 'auto', padding: DS.space.xl } }, content),
@@ -3020,6 +3047,7 @@ window.__ModuleLoader__.load({
       'nav.create': '创作',
       'nav.visual': '可视化',
       'nav.maintain': '维护',
+      'nav.pin': '固定',
       'home.heroTag': '项目首页',
       'home.untitled': '未命名世界',
       'home.noIntro': '尚未填写简介',
@@ -3175,6 +3203,7 @@ window.__ModuleLoader__.load({
       'nav.create': 'Create',
       'nav.visual': 'Visualize',
       'nav.maintain': 'Maintain',
+      'nav.pin': 'Pin',
       'home.heroTag': 'Project home',
       'home.untitled': 'Untitled world',
       'home.noIntro': 'No introduction yet',
