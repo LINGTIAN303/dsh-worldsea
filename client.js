@@ -2215,13 +2215,25 @@ window.__ModuleLoader__.load({
     }
 
     /** schema 字段渲染：view 模式或 edit 模式。 */
+    /** 字段显示模式（对齐 WorldSea 字段式切换 chips：分组式/表格式/段落式/摘要式/时间轴式——插件实现段落式与键值式两档）。 */
+    const DETAIL_VIEW_MODES = ['grouped', 'kv'];
+
     function FieldRow(props) {
-      const { field, value, editing, onChange } = props;
+      const { field, value, editing, onChange, showEmpty, kvMode } = props;
       if (!editing) {
-        if (value === undefined || value === '') return null;
-        return h('div', { style: { display: 'flex', gap: 12, padding: '5px 0', fontSize: DS.font.md } },
-          h('span', { style: { width: 90, flexShrink: 0, color: 'var(--ws-text-secondary)' } }, field.label),
-          h('span', { style: { color: 'var(--ws-text-primary)', whiteSpace: 'pre-wrap' } }, String(value)),
+        // 空值显示「—」（对齐截图段落式：未填字段也占位，保持信息结构）。
+        const empty = value === undefined || value === '';
+        if (empty && !showEmpty) return null;
+        if (kvMode) {
+          // 键值式：label 左、值右的两栏行。
+          return h('div', { style: { display: 'flex', gap: DS.space.md, padding: '6px 0', fontSize: DS.font.md, borderBottom: '1px solid var(--ws-border)' } },
+            h('span', { style: { width: 100, flexShrink: 0, color: 'var(--ws-text-secondary)' } }, field.label),
+            h('span', { style: { flex: 1, color: 'var(--ws-text-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }, empty ? '—' : String(value)),
+          );
+        }
+        return h('div', { style: { marginBottom: DS.space.md } },
+          h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginBottom: DS.space.xs } }, field.label),
+          h('div', { style: { fontSize: DS.font.md, color: empty ? 'var(--ws-text-muted)' : 'var(--ws-text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 } }, empty ? '—' : String(value)),
         );
       }
       let control;
@@ -2301,7 +2313,10 @@ window.__ModuleLoader__.load({
       // Facet 页仅宿主类型有字段组时显示；关系页常显。
       const facetGroups = FACET_FIELD_GROUPS.filter(g => g.hostType === entity.type);
       const [tab, setTab] = React.useState('info');
-      React.useEffect(() => { setTab('info'); }, [entity.id]);
+      const [viewMode, setViewMode] = React.useState('grouped');
+      React.useEffect(() => { setTab('info'); setViewMode('grouped'); }, [entity.id]);
+      /** 属性取值便捷函数。 */
+      const e2p = key => entity.properties[key];
 
       /** Tab 头（WorldSea 式：文字页签 + 2px 下划线选中）。 */
       const tabBtn = (id, label) => h('button', {
@@ -2341,9 +2356,31 @@ window.__ModuleLoader__.load({
               entity.description
                 ? h('div', { style: { fontSize: DS.font.md, marginBottom: DS.space.md, lineHeight: 1.6, whiteSpace: 'pre-wrap' } }, entity.description)
                 : null,
-              fields.map(f => h(FieldRow, {
-                key: f.key, field: f, value: entity.properties[f.key], editing: false,
-              })),
+              // 显示模式 chips（对齐截图：分组式/表格式/段落式…——插件落地键值式/段落式两档）。
+              h('div', { style: { display: 'flex', gap: DS.space.xs, marginBottom: DS.space.md, flexWrap: 'wrap' } },
+                DETAIL_VIEW_MODES.map(mode => h('button', {
+                  key: mode,
+                  onClick: () => setViewMode(mode),
+                  style: {
+                    ...dsControlBase,
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '3px 10px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.xs,
+                    border: '1px solid ' + (viewMode === mode ? 'var(--ws-accent-soft-border)' : 'var(--ws-border)'),
+                    background: viewMode === mode ? DS.activeBg : 'transparent',
+                    color: viewMode === mode ? 'var(--ws-accent)' : 'var(--ws-text-secondary)',
+                  },
+                },
+                  h('span', { style: { color: 'var(--ws-accent)' } }, viewMode === mode ? '☑' : '☐'),
+                  t('detail.mode.' + mode),
+                ))),
+              // 字段（viewMode=kv 键值两栏 / grouped 段落式含空值占位）。
+              viewMode === 'kv'
+                ? fields.filter(f => e2p(f.key) !== undefined && e2p(f.key) !== '').map(f => h(FieldRow, {
+                  key: f.key, field: f, value: e2p(f.key), editing: false, showEmpty: false, kvMode: true,
+                }))
+                : fields.map(f => h(FieldRow, {
+                  key: f.key, field: f, value: e2p(f.key), editing: false, showEmpty: true,
+                })),
             ) : null,
             tab === 'facet' ? facetGroups.map(g =>
               h(FacetSection, { key: g.id, group: g, entity, actions, t })) : null,
@@ -3188,6 +3225,8 @@ window.__ModuleLoader__.load({
       'detail.tabInfo': '资料',
       'detail.tabFacet': '扩展',
       'detail.tabRelations': '关系',
+      'detail.mode.grouped': '段落式',
+      'detail.mode.kv': '键值式',
       'links.repo': 'WorldSea 主仓库',
       'links.pluginRepo': '本插件仓库',
       'links.dsh': 'DeepSeek Harness (dsh)',
@@ -3344,6 +3383,8 @@ window.__ModuleLoader__.load({
       'detail.tabInfo': 'Info',
       'detail.tabFacet': 'Ext',
       'detail.tabRelations': 'Relations',
+      'detail.mode.grouped': 'Grouped',
+      'detail.mode.kv': 'Key-value',
       'links.repo': 'WorldSea main repository',
       'links.pluginRepo': 'This plugin repository',
       'links.dsh': 'DeepSeek Harness (dsh)',
