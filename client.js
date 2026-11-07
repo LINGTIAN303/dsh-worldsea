@@ -1110,6 +1110,80 @@ window.__ModuleLoader__.load({
       return issues;
     }
 
+    /**
+     * 设定集（对齐 official.codex：按语义域分章聚合阅读全部条目 + 整本导出）。
+     * 分章 = 域（生命/地理/…/用户自定义类型的域）；导出 = Markdown 整本。
+     */
+    function CodexView(props) {
+      const { entities, allTypes, t } = props;
+      const [chapter, setChapter] = React.useState('');
+
+      /** 域 → 该域全部实体（按类型再分组）。 */
+      const chapters = DOMAINS.map(d => ({
+        domain: d,
+        groups: allTypes
+          .filter(def => def.domain === d.id)
+          .map(def => ({ def, items: entities.filter(e => e.type === def.type) }))
+          .filter(g => g.items.length > 0),
+      })).filter(c => c.groups.length > 0);
+      const active = chapters.find(c => c.domain.id === chapter) || chapters[0];
+
+      /** 整本导出 Markdown。 */
+      const exportMarkdown = () => {
+        const lines = ['# WorldSea 设定集', '', '>' + t('codex.exportedAt').replace('{date}', new Date().toISOString().slice(0, 10)), ''];
+        for (const c of chapters) {
+          lines.push('## ' + c.domain.label, '');
+          for (const g of c.groups) {
+            lines.push('### ' + g.def.label, '');
+            for (const e of g.items) {
+              lines.push('#### ' + e.title, '');
+              if (e.description) lines.push(e.description, '');
+              const props = g.def.fields.filter(f => e.properties[f.key] !== undefined && e.properties[f.key] !== '');
+              for (const f of props) lines.push('- **' + f.label + '**: ' + e.properties[f.key]);
+              if (e.tags.length) lines.push('- **' + t('codex.tags') + '**: ' + e.tags.join('、'));
+              lines.push('');
+            }
+          }
+        }
+        const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'worldsea-codex-' + new Date().toISOString().slice(0, 10) + '.md';
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      return h('div', null,
+        h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' } },
+          h('select', {
+            value: active ? active.domain.id : '',
+            onChange: e => setChapter(e.target.value),
+            style: { ...inputStyle, width: 'auto', padding: '4px 10px', fontSize: 13 },
+          },
+            chapters.map(c => h('option', { key: c.domain.id, value: c.domain.id },
+              c.domain.label + '（' + c.groups.reduce((n, g) => n + g.items.length, 0) + '）'))),
+          h('div', { style: { flex: 1 } }),
+          h(PrimaryButton, { small: true, onClick: exportMarkdown }, t('codex.export')),
+        ),
+        !active
+          ? h(Card, { pad: 28 }, h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('codex.empty')))
+          : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } },
+            active.groups.map(g => h(Card, { key: g.def.type, pad: 14 },
+              h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 } },
+                h(TypeGlyph, { glyph: g.def.glyph, size: 15 }),
+                h('div', { style: { fontSize: 15, fontWeight: 700 } }, g.def.label),
+                h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, '× ' + g.items.length),
+              ),
+              g.items.map(e => h('div', { key: e.id, style: { padding: '8px 0', borderTop: '1px solid var(--dsw-alias-border-l1)' } },
+                h('div', { style: { fontSize: 14, fontWeight: 600 } }, e.title),
+                e.description ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginTop: 2, whiteSpace: 'pre-wrap' } }, e.description.slice(0, 120)) : null,
+                e.tags.length ? h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-brand-primary)', marginTop: 2 } }, e.tags.join(' · ')) : null,
+              )),
+            ))),
+      );
+    }
+
     /** 健康检查视图：运行校验 + 一键修复（悬挂关系删除、空标题重命名）。 */
     function HealthView(props) {
       const { entities, relations, actions, t } = props;
@@ -1845,6 +1919,7 @@ window.__ModuleLoader__.load({
           h('button', { onClick: () => actions.setView('workbench'), style: pill(view === 'workbench') }, t('tab.workbench')),
           h('button', { onClick: () => actions.setView('graph'), style: pill(view === 'graph') }, t('tab.graph')),
           h('button', { onClick: () => actions.setView('timeline'), style: pill(view === 'timeline') }, t('tab.timeline')),
+          h('button', { onClick: () => actions.setView('codex'), style: pill(view === 'codex') }, t('tab.codex')),
           h('button', { onClick: () => actions.setView('health'), style: pill(view === 'health') }, t('tab.health')),
           h('button', { onClick: () => actions.setView('portal'), style: pill(view === 'portal') }, t('tab.portal')),
         ),
@@ -1880,7 +1955,9 @@ window.__ModuleLoader__.load({
             ? h(GraphView, { entities, relations, actions, t })
             : view === 'timeline'
               ? h(TimelineView, { entities, actions, t })
-              : view === 'health'
+              : view === 'codex'
+                ? h(CodexView, { entities, allTypes, t })
+                : view === 'health'
                 ? h(HealthView, { entities, relations, actions, t })
                 : h('div', null,
             // 域页签（第一级）
@@ -2064,6 +2141,7 @@ window.__ModuleLoader__.load({
       'tab.graph': '图谱',
       'tab.timeline': '时间线',
       'tab.health': '体检',
+      'tab.codex': '设定集',
       'tab.portal': '门户',
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
       'graph.filter': '只看关系',
@@ -2105,6 +2183,10 @@ window.__ModuleLoader__.load({
       'customType.add': '添加类型',
       'customType.fieldsHint': '字段行示例：\norigin|出身地|text\ntier|阶级|select|下位,中位,上位',
       'customType.removeConfirm': '删除类型「{label}」会一并删除其下全部实体与关系，确定？',
+      'codex.export': '导出整本 Markdown',
+      'codex.exportedAt': '导出于 {date}',
+      'codex.tags': '标签',
+      'codex.empty': '暂无内容；先到「工作台」创建实体。',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -2162,6 +2244,7 @@ window.__ModuleLoader__.load({
       'tab.graph': 'Graph',
       'tab.timeline': 'Timeline',
       'tab.health': 'Health',
+      'tab.codex': 'Codex',
       'tab.portal': 'Portal',
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
       'graph.filter': 'Show relation',
@@ -2203,6 +2286,10 @@ window.__ModuleLoader__.load({
       'customType.add': 'Add type',
       'customType.fieldsHint': 'Field line examples:\norigin|Birthplace|text\ntier|Tier|select|low,mid,high',
       'customType.removeConfirm': 'Deleting "{label}" also deletes all its entities and relations. Continue?',
+      'codex.export': 'Export Markdown',
+      'codex.exportedAt': 'Exported at {date}',
+      'codex.tags': 'Tags',
+      'codex.empty': 'Nothing to compile yet; create entities in the workbench first.',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
