@@ -2057,12 +2057,29 @@ window.__ModuleLoader__.load({
       );
     }
 
-    /** 数据管理区块：导出 / 导入 / 清空（JSON 全量，与 store state 同构）。 */
+    /** 数据管理区块：导出 / 导入 / 清空（JSON 全量，与 store state 同构）+ 存储用量与备份提醒。 */
     function DataSection(props) {
       const { useStore, actions, t } = props;
       const fileRef = React.useRef(null);
       const snapshot = useStore(s => s.entities && s.relations ? { entities: s.entities, relations: s.relations } : null);
       const [notice, setNotice] = React.useState('');
+      // 存储用量（PERSIST_KEY 键的字节数）与最近导出时间（模块级变量，跨渲染保留）。
+      const [usage, setUsage] = React.useState(null);
+      const lastExportRef = React.useRef(null);
+      React.useEffect(() => {
+        try {
+          const raw = localStorage.getItem(PERSIST_KEY);
+          setUsage(raw ? new Blob([raw]).size : 0);
+        } catch (_e) {
+          // Blob 不可用（非浏览器环境）时省略用量显示，不影响功能。
+          setUsage(null);
+        }
+      }, [snapshot]);
+      // 距上次导出超过 7 天提示备份（上次导出时间记录在 localStorage，随导出刷新）。
+      const lastExport = (() => {
+        try { return localStorage.getItem(PERSIST_KEY + '.lastExport'); } catch (_e) { return null; }
+      })();
+      const stale = lastExport ? (Date.now() - Number(lastExport)) > 7 * 24 * 3600 * 1000 : true;
 
       /** 导出：全量 JSON 下载。 */
       const exportJson = () => {
@@ -2074,6 +2091,7 @@ window.__ModuleLoader__.load({
         a.download = 'worldsea-workbench-' + new Date().toISOString().slice(0, 10) + '.json';
         a.click();
         URL.revokeObjectURL(url);
+        try { localStorage.setItem(PERSIST_KEY + '.lastExport', String(Date.now())); } catch (_e) { /* 存储失败仅丢失提醒时间戳 */ }
         setNotice(t('data.exported'));
       };
 
@@ -2110,7 +2128,10 @@ window.__ModuleLoader__.load({
           }),
         ),
         snapshot ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
-          t('data.counts').replace('{e}', String(snapshot.entities.length)).replace('{r}', String(snapshot.relations.length))) : null,
+          t('data.counts').replace('{e}', String(snapshot.entities.length)).replace('{r}', String(snapshot.relations.length))
+          + (usage !== null ? ' · ' + t('data.usage').replace('{kb}', String(Math.round(usage / 1024))) : '')) : null,
+        snapshot && stale && snapshot.entities.length > 0 ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-state-warn-primary)', marginTop: 4 } },
+          t('data.staleReminder')) : null,
         notice ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-state-success-primary)', marginTop: 4 } }, notice) : null,
       );
     }
@@ -2605,6 +2626,8 @@ window.__ModuleLoader__.load({
       'data.imported': '已导入 {n} 个实体（含关系）。',
       'data.importFailed': '导入失败：文件不是有效的 JSON 或结构不符。',
       'data.counts': '当前：{e} 个实体 · {r} 条关系',
+      'data.usage': '存储 {kb} KB',
+      'data.staleReminder': '已超过 7 天未导出备份——localStorage 不在插件卸载保护范围内，建议先导出 JSON。',
       'tab.title': 'WorldSea',
       'guide.title': 'WorldSea 工作台',
       'guide.description': '世界观创作工作台：实体管理与门户',
@@ -2733,6 +2756,8 @@ window.__ModuleLoader__.load({
       'data.imported': 'Imported {n} entities (with relations).',
       'data.importFailed': 'Import failed: not valid JSON or unexpected structure.',
       'data.counts': 'Now: {e} entities · {r} relations',
+      'data.usage': '{kb} KB stored',
+      'data.staleReminder': 'No backup export for over 7 days — localStorage is not protected from uninstall; exporting JSON first is recommended.',
       'tab.title': 'WorldSea',
       'guide.title': 'WorldSea workbench',
       'guide.description': 'Worldbuilding workbench: entity management and portal',
