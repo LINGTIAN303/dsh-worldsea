@@ -405,6 +405,8 @@ window.__ModuleLoader__.load({
         editing: false,
         draft: null,
         search: '',
+        batchMode: false,
+        batchSelection: [],
       }),
       persist: PERSIST_KEY,
       actions: {
@@ -527,6 +529,33 @@ window.__ModuleLoader__.load({
           if (note.trim()) rel.properties.note = note;
           else delete rel.properties.note;
           rel.updatedAt = new Date().toISOString();
+        },
+        /** 批量模式切换。 */
+        toggleBatchMode(draft) { draft.batchMode = !draft.batchMode; draft.batchSelection = []; },
+        /** 批量选择切换。 */
+        toggleBatchItem(draft, id) {
+          if (!draft.batchSelection) draft.batchSelection = [];
+          const i = draft.batchSelection.indexOf(id);
+          if (i >= 0) draft.batchSelection.splice(i, 1);
+          else draft.batchSelection.push(id);
+        },
+        /** 批量加标签。 */
+        batchAddTag(draft, tag) {
+          const t = (tag || '').trim();
+          if (!t || !draft.batchSelection?.length) return;
+          for (const id of draft.batchSelection) {
+            const entity = draft.entities.find(e => e.id === id);
+            if (entity && !entity.tags.includes(t)) { entity.tags.push(t); entity.updatedAt = new Date().toISOString(); }
+          }
+        },
+        /** 批量删除（含所选实体参与的全部关系）。 */
+        batchRemove(draft) {
+          if (!draft.batchSelection?.length) return;
+          const doomed = new Set(draft.batchSelection);
+          draft.entities = draft.entities.filter(e => !doomed.has(e.id));
+          draft.relations = draft.relations.filter(r => !doomed.has(r.sourceId) && !doomed.has(r.targetId));
+          if (draft.selectedId && doomed.has(draft.selectedId)) { draft.selectedId = null; draft.editing = false; draft.draft = null; }
+          draft.batchSelection = [];
         },
         /**
          * 建关系：有向边 source→target；非对称关系自动补逆边（pairId 互指）。
@@ -1505,6 +1534,7 @@ window.__ModuleLoader__.load({
     /** 工作台主体（左栏 main 与右栏 tab 共用组件）。 */
     function Workbench(props) {
       const { useStore, actions, t } = props;
+      const batchTagRef = React.useRef(null);
       const entities = useStore(s => s.entities);
       const relations = useStore(s => s.relations);
       const activeDomain = useStore(s => s.activeDomain);
@@ -1513,6 +1543,8 @@ window.__ModuleLoader__.load({
       const view = useStore(s => s.view);
       const search = useStore(s => s.search);
       const customRelationTypes = useStore(s => s.customRelationTypes || []);
+      const batchMode = useStore(s => s.batchMode);
+      const batchSelection = useStore(s => s.batchSelection || []);
 
       const typeDef = ENTITY_TYPES.find(x => x.type === activeType) || ENTITY_TYPES[0];
       // 旧持久化数据可能缺 activeDomain：按当前类型回推。
@@ -1660,23 +1692,68 @@ window.__ModuleLoader__.load({
                     style: { ...inputStyle, width: 180, padding: '4px 10px', fontSize: 12 },
                   }),
                   h('div', { style: { flex: 1 } }),
+                  h(GhostButton, { small: true, onClick: () => actions.toggleBatchMode() }, batchMode ? t('batch.exit') : t('batch.enter')),
                   h(GhostButton, { small: true, onClick: () => actions.createFromTemplate(typeDef.type) }, t('workbench.newFromTemplate')),
                   h(PrimaryButton, { small: true, onClick: () => actions.create(typeDef.type, t('workbench.untitled')) }, t('workbench.new')),
                 ),
+                // 批量操作条。
+                batchMode ? h('div', {
+                  style: {
+                    display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+                    padding: '7px 12px', borderRadius: 8, flexWrap: 'wrap',
+                    background: 'var(--dsw-alias-bg-layer-2)', fontSize: 13,
+                  },
+                },
+                  h('span', { style: { fontWeight: 600 } }, t('batch.selected').replace('{n}', String(batchSelection.length))),
+                  h('input', {
+                    ref: batchTagRef,
+                    placeholder: t('batch.tagPlaceholder'),
+                    onKeyDown: e => {
+                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                        actions.batchAddTag(e.currentTarget.value);
+                        e.currentTarget.value = '';
+                      }
+                    },
+                    style: { ...inputStyle, width: 150, padding: '4px 8px', fontSize: 12 },
+                  }),
+                  h(GhostButton, { small: true, onClick: () => { const el = batchTagRef.current; if (el && el.value.trim()) { actions.batchAddTag(el.value); el.value = ''; } } }, t('batch.applyTag')),
+                  h(GhostButton, {
+                    small: true,
+                    onClick: () => {
+                      if (batchSelection.length && window.confirm(t('batch.deleteConfirm').replace('{n}', String(batchSelection.length)))) actions.batchRemove();
+                    },
+                  }, t('batch.delete')),
+                ) : null,
                 list.length === 0
                   ? h(Card, { pad: 28 }, h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('workbench.empty')))
                   : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 } },
                     list.map(e => h(Card, { key: e.id, pad: 12 },
-                      h('div', {
-                        onClick: () => actions.selectEntity(e.id),
-                        style: { cursor: 'pointer' },
-                      },
-                        h('div', { style: { fontSize: 14, fontWeight: 600, marginBottom: 4 } }, e.title),
-                        h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: 8 } },
-                          h('span', null, e.updatedAt.slice(0, 10)),
-                          e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
+                      batchMode
+                        ? h('div', {
+                          onClick: () => actions.toggleBatchItem(e.id),
+                          style: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' },
+                        },
+                          h('input', {
+                            type: 'checkbox', checked: batchSelection.includes(e.id), readOnly: true,
+                            style: { accentColor: 'var(--dsw-alias-brand-primary)', cursor: 'pointer' },
+                          }),
+                          h('div', null,
+                            h('div', { style: { fontSize: 14, fontWeight: 600, marginBottom: 4 } }, e.title),
+                            h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: 8 } },
+                              h('span', null, e.updatedAt.slice(0, 10)),
+                              e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
+                            )),
+                        )
+                        : h('div', {
+                          onClick: () => actions.selectEntity(e.id),
+                          style: { cursor: 'pointer' },
+                        },
+                          h('div', { style: { fontSize: 14, fontWeight: 600, marginBottom: 4 } }, e.title),
+                          h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', display: 'flex', gap: 8 } },
+                            h('span', null, e.updatedAt.slice(0, 10)),
+                            e.tags.length ? h('span', null, e.tags.join(' · ')) : null,
+                          ),
                         ),
-                      ),
                     ))),
               ),
           ),
@@ -1758,6 +1835,13 @@ window.__ModuleLoader__.load({
       'facet.filled': '已填',
       'relations.editProps': '属性',
       'relations.notePlaceholder': '关系备注（如：相识于某事件）…',
+      'batch.enter': '多选',
+      'batch.exit': '退出多选',
+      'batch.selected': '已选 {n} 项',
+      'batch.tagPlaceholder': '标签名…',
+      'batch.applyTag': '加标签',
+      'batch.delete': '删除所选',
+      'batch.deleteConfirm': '确定删除所选 {n} 个实体及其全部关系？',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -1832,6 +1916,13 @@ window.__ModuleLoader__.load({
       'facet.filled': 'filled',
       'relations.editProps': 'note',
       'relations.notePlaceholder': 'Relation note (e.g. met during …)…',
+      'batch.enter': 'Select',
+      'batch.exit': 'Exit select',
+      'batch.selected': '{n} selected',
+      'batch.tagPlaceholder': 'Tag name…',
+      'batch.applyTag': 'Add tag',
+      'batch.delete': 'Delete',
+      'batch.deleteConfirm': 'Delete {n} selected entities and all their relations?',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
