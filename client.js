@@ -2140,9 +2140,34 @@ window.__ModuleLoader__.load({
       const editing = useStore(s => s.editing);
       const draft = useStore(s => s.draft);
 
+      // 详情内容分区（对齐 WorldSea dp-shell Tab 语义）：资料 / 扩展（Facet）/ 关系 三页签。
+      // Facet 页仅宿主类型有字段组时显示；关系页常显。
+      const facetGroups = FACET_FIELD_GROUPS.filter(g => g.hostType === entity.type);
+      const [tab, setTab] = React.useState('info');
+      React.useEffect(() => { setTab('info'); }, [entity.id]);
+
+      /** Tab 头（WorldSea 式：文字页签 + 2px 下划线选中）。 */
+      const tabBtn = (id, label) => h('button', {
+        key: id,
+        onClick: () => setTab(id),
+        style: {
+          ...dsControlBase,
+          padding: '6px 4px', border: 'none', borderBottom: '2px solid ' + (tab === id ? 'var(--dsw-alias-brand-primary)' : 'transparent'),
+          background: 'transparent', color: tab === id ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-secondary)',
+          fontSize: DS.font.sm, cursor: 'pointer', fontWeight: tab === id ? 600 : 400,
+        },
+      }, label);
+
       if (!editing) {
-        return h('div', null,
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.md } },
+        return h('div', { style: { display: 'flex', flexDirection: 'column', minHeight: 0 } },
+          // Tab 头
+          h('div', { style: { display: 'flex', gap: DS.space.md, borderBottom: '1px solid var(--dsw-alias-border-l1)', marginBottom: DS.space.md, flexShrink: 0 } },
+            tabBtn('info', t('detail.tabInfo')),
+            facetGroups.length ? tabBtn('facet', t('detail.tabFacet') + ' (' + facetGroups.length + ')') : null,
+            tabBtn('relations', t('detail.tabRelations')),
+          ),
+          // 操作行（编辑/删除随 tab 常驻右上——对齐 WorldSea 详情头部动作区）
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.md, flexShrink: 0 } },
             h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
               entity.updatedAt.slice(0, 10) + ' · ' + entity.id),
             h('div', { style: { flex: 1 } }),
@@ -2152,18 +2177,21 @@ window.__ModuleLoader__.load({
               onClick: () => { if (window.confirm(t('detail.deleteConfirm').replace('{title}', entity.title))) actions.remove(entity.id); },
             }, t('detail.delete')),
           ),
-          h(TagsSection, { entity, actions, t }),
-          entity.description
-            ? h('div', { style: { fontSize: DS.font.md, marginBottom: DS.space.md, lineHeight: 1.6, whiteSpace: 'pre-wrap' } }, entity.description)
-            : null,
-          fields.map(f => h(FieldRow, {
-            key: f.key, field: f, value: entity.properties[f.key], editing: false,
-          })),
-          // Facet 字段组（对齐 WorldSea WeaponFacet/ApparelFacet 挂宿主类型的语义）。
-          FACET_FIELD_GROUPS.filter(g => g.hostType === entity.type).map(g =>
-            h(FacetSection, { key: g.id, group: g, entity, actions, t })),
-          h('div', { style: { marginTop: DS.space.md } },
-            h(RelationsSection, { relations: allRelations, entities: allEntities, selfId: entity.id, customRelationTypes, actions, t })),
+          // Tab 主体（滚动区）
+          h('div', { style: { flex: 1, minHeight: 0, overflowY: 'auto' } },
+            tab === 'info' ? h('div', null,
+              h(TagsSection, { entity, actions, t }),
+              entity.description
+                ? h('div', { style: { fontSize: DS.font.md, marginBottom: DS.space.md, lineHeight: 1.6, whiteSpace: 'pre-wrap' } }, entity.description)
+                : null,
+              fields.map(f => h(FieldRow, {
+                key: f.key, field: f, value: entity.properties[f.key], editing: false,
+              })),
+            ) : null,
+            tab === 'facet' ? facetGroups.map(g =>
+              h(FacetSection, { key: g.id, group: g, entity, actions, t })) : null,
+            tab === 'relations' ? h(RelationsSection, { relations: allRelations, entities: allEntities, selfId: entity.id, customRelationTypes, actions, t }) : null,
+          ),
         );
       }
 
@@ -2924,6 +2952,9 @@ window.__ModuleLoader__.load({
       'detail.save': '保存',
       'detail.titleLabel': '标题',
       'detail.descLabel': '描述',
+      'detail.tabInfo': '资料',
+      'detail.tabFacet': '扩展',
+      'detail.tabRelations': '关系',
       'links.repo': 'WorldSea 主仓库',
       'links.pluginRepo': '本插件仓库',
       'links.dsh': 'DeepSeek Harness (dsh)',
@@ -3058,6 +3089,9 @@ window.__ModuleLoader__.load({
       'detail.save': 'Save',
       'detail.titleLabel': 'Title',
       'detail.descLabel': 'Description',
+      'detail.tabInfo': 'Info',
+      'detail.tabFacet': 'Ext',
+      'detail.tabRelations': 'Relations',
       'links.repo': 'WorldSea main repository',
       'links.pluginRepo': 'This plugin repository',
       'links.dsh': 'DeepSeek Harness (dsh)',
