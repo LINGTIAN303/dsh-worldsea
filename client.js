@@ -207,6 +207,39 @@ window.__ModuleLoader__.load({
       { key: 'location', label: '发生地点', fieldType: 'text' },
     ];
 
+    /** 战力体系（WorldSea official.combat_stats ownFields 原样抄录）。 */
+    const COMBAT_STAT_FIELDS = [
+      { key: 'system', label: '体系', fieldType: 'select', options: ['境界制', '等级制', '数值制'] },
+      { key: 'tier', label: '层级排序', fieldType: 'number' },
+      { key: 'realm', label: '境界/等级', fieldType: 'text' },
+      { key: 'promotion', label: '晋升条件', fieldType: 'textarea' },
+      { key: 'bottleneck', label: '瓶颈/突破难点', fieldType: 'textarea' },
+      { key: 'power', label: '战力表现', fieldType: 'textarea' },
+      { key: 'culture', label: '所属文化圈', fieldType: 'select', options: ['中式', '西式', '混合'] },
+    ];
+
+    /**
+     * 武器/服饰特性（对齐 WorldSea WeaponFacet/ApparelFacet——它们挂在 Item 上而非独立实体；
+     * 本插件以「可选字段组」对齐：item 类型的表单在基础字段后追加这两组，不填即不显示）。
+     */
+    const WEAPON_FACET_FIELDS = [
+      { key: 'weaponType', label: '武器类型', fieldType: 'select', options: ['剑', '刀', '枪', '弓', '法器', '盾', '暗器', '其他'] },
+      { key: 'rank', label: '品级', fieldType: 'select', options: ['凡品', '祥品', '灵品', '圣器', '神器'] },
+      { key: 'smith', label: '锻造者', fieldType: 'text' },
+      { key: 'forgedAt', label: '锻造时间', fieldType: 'text' },
+      { key: 'specialAbility', label: '特殊能力', fieldType: 'textarea' },
+      { key: 'battles', label: '战绩摘要', fieldType: 'textarea' },
+    ];
+    const APPAREL_FACET_FIELDS = [
+      { key: 'apparelType', label: '服饰类型', fieldType: 'select', options: ['上衣', '下装', '连衣裙', '外套/披风', '头饰', '鞋履', '手套', '饰品/首饰', '轻甲', '中甲', '重甲', '盾牌', '法袍', '套装'] },
+      { key: 'armorClass', label: '护甲等级', fieldType: 'select', options: ['无防护', '布甲', '皮甲', '锁甲', '板甲', '法袍', '饰品'] },
+      { key: 'style', label: '风格', fieldType: 'select', options: ['朴素', '华丽', '异域', '军用', '仪式', '日常', '伪装', '工装'] },
+      { key: 'defense', label: '防御值', fieldType: 'number' },
+      { key: 'weight', label: '重量', fieldType: 'select', options: ['极轻', '轻', '中等', '重', '极重'] },
+      { key: 'durability', label: '耐久度', fieldType: 'select', options: ['易损', '普通', '耐用', '坚固', '不毁'] },
+      { key: 'significance', label: '意义', fieldType: 'textarea' },
+    ];
+
     /** 实体类型注册表（manifest 对齐 WorldSea 官方插件形态；15 类覆盖创作域主力，按域分组）。 */
     const ENTITY_TYPES = [
       { type: 'character', label: '角色', domain: 'life', fields: CHARACTER_FIELDS, glyph: 'user' },
@@ -224,6 +257,16 @@ window.__ModuleLoader__.load({
       { type: 'concept', label: '概念', domain: 'knowledge', fields: CONCEPT_FIELDS, glyph: 'bulb' },
       { type: 'conflict', label: '冲突', domain: 'history', fields: CONFLICT_FIELDS, glyph: 'swords' },
       { type: 'event', label: '事件', domain: 'history', fields: EVENT_FIELDS, glyph: 'clock' },
+      { type: 'combat_stat', label: '战力体系', domain: 'arcane', fields: COMBAT_STAT_FIELDS, glyph: 'shield' },
+    ];
+
+    /**
+     * Facet 字段组（对齐 WorldSea WeaponFacet/ApparelFacet）：挂在宿主类型的
+     * 基础字段之后，详情表单折叠渲染，全部可选（未填字段详情页不显示）。
+     */
+    const FACET_FIELD_GROUPS = [
+      { hostType: 'item', id: 'weapon', label: '武器特性', fields: WEAPON_FACET_FIELDS, glyph: 'swords' },
+      { hostType: 'item', id: 'apparel', label: '服饰特性', fields: APPAREL_FACET_FIELDS, glyph: 'mask' },
     ];
 
     /** 域分组（类型条的第一级页签）。 */
@@ -258,6 +301,7 @@ window.__ModuleLoader__.load({
       culture: { title: '示例文化', properties: { cultureType: '节日', cycle: '每年秋分', } },
       conflict: { title: '示例冲突', properties: { conflictType: '局部冲突', scale: '区域', } },
       event: { title: '示例事件', properties: { date: '元年 春', importance: '关键', status: '正史', } },
+      combat_stat: { title: '示例战力体系', properties: { system: '境界制', tier: 1, realm: '炼气一层', culture: '中式', } },
     };
 
     // ─────────────────────────────────────────────
@@ -465,6 +509,14 @@ window.__ModuleLoader__.load({
           const entity = draft.entities.find(e => e.id === id);
           if (!entity) return;
           entity.tags = entity.tags.filter(x => x !== tag);
+          entity.updatedAt = new Date().toISOString();
+        },
+        /** Facet 字段即时写：单字段 patch，无需整体编辑态。 */
+        patchProperties(draft, id, key, value) {
+          const entity = draft.entities.find(e => e.id === id);
+          if (!entity) return;
+          if (value === '' || value === undefined) delete entity.properties[key];
+          else entity.properties[key] = value;
           entity.updatedAt = new Date().toISOString();
         },
         /**
@@ -698,6 +750,10 @@ window.__ModuleLoader__.load({
           return h('svg', common,
             h('circle', { cx: 12, cy: 12, r: 8.5 }),
             h('path', { d: 'M12 7v5l3.5 2' }));
+        case 'shield':
+          return h('svg', common,
+            h('path', { d: 'M12 3l7 3v5c0 5-3.2 8.2-7 10-3.8-1.8-7-5-7-10V6l7-3z' }),
+            h('path', { d: 'M9 12l2 2 4-4' }));
         default:
           return h('svg', common, h('circle', { cx: 12, cy: 12, r: 8 }));
       }
@@ -897,6 +953,7 @@ window.__ModuleLoader__.load({
         building: '#8d7355', creature: '#c0653a', plant: '#5f9e4c',
         language: '#4a90a4', concept: '#7f8fa6', faith: '#d4a017',
         culture: '#b565a7', conflict: '#d9534f', event: '#5bc0de',
+        combat_stat: '#6c7ae0',
       };
       const colorOf = e => TYPE_COLORS[e.type] || '#8a8f9d';
 
@@ -1218,6 +1275,37 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** Facet 字段组区块：折叠面板，展开即编辑（直接写实体，无需进入编辑态——facet 语义是附属数据）。 */
+    function FacetSection(props) {
+      const { group, entity, actions, t } = props;
+      const [open, setOpen] = React.useState(false);
+      const filled = group.fields.some(f => entity.properties[f.key] !== undefined && entity.properties[f.key] !== '');
+      return h('div', { style: { marginTop: 10 } },
+        h('div', {
+          onClick: () => setOpen(!open),
+          style: {
+            display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer',
+            borderRadius: 8, background: 'var(--dsw-alias-bg-layer-2)', fontSize: 13,
+          },
+        },
+          h(TypeGlyph, { glyph: group.glyph, size: 13 }),
+          h('span', { style: { fontWeight: 600 } }, group.label),
+          filled ? h('span', {
+            style: { fontSize: 11, color: 'var(--dsw-alias-state-success-primary)' },
+          }, t('facet.filled')) : null,
+          h('span', { style: { flex: 1 } }),
+          h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, open ? '▾' : '▸'),
+        ),
+        open ? h(Card, { pad: 12 },
+          group.fields.map(f => h(FieldRow, {
+            key: f.key, field: f,
+            value: entity.properties[f.key], editing: true,
+            onChange: (key, value) => actions.patchProperties(entity.id, key, value),
+          })),
+        ) : null,
+      );
+    }
+
     /** 实体详情/编辑面板。 */
     function EntityDetail(props) {
       const { useStore, actions, entity, fields, allRelations, allEntities, customRelationTypes, onBack, t } = props;
@@ -1247,6 +1335,9 @@ window.__ModuleLoader__.load({
               key: f.key, field: f, value: entity.properties[f.key], editing: false,
             })),
           ),
+          // Facet 字段组（对齐 WorldSea WeaponFacet/ApparelFacet 挂宿主类型的语义）。
+          FACET_FIELD_GROUPS.filter(g => g.hostType === entity.type).map(g =>
+            h(FacetSection, { key: g.id, group: g, entity, actions, t })),
           h('div', { style: { marginTop: 12 } },
             h(RelationsSection, { relations: allRelations, entities: allEntities, selfId: entity.id, customRelationTypes, actions, t })),
         );
@@ -1631,6 +1722,7 @@ window.__ModuleLoader__.load({
       'stats.relations': '关系',
       'stats.tags': '标签',
       'stats.updated': '最近更新',
+      'facet.filled': '已填',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -1702,6 +1794,7 @@ window.__ModuleLoader__.load({
       'stats.relations': 'Relations',
       'stats.tags': 'Tags',
       'stats.updated': 'Last updated',
+      'facet.filled': 'filled',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
