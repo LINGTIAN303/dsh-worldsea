@@ -2640,10 +2640,16 @@ window.__ModuleLoader__.load({
                   },
                 }, t('batch.delete')),
               ) : null,
-              // 列表网格。
+              // 列表网格（对齐 WorldSea .entity-grid：minmax 220px / gap 12 / min-content 行 / 自滚动）。
               list.length === 0
                 ? h(EmptyState, null, t('workbench.empty'))
-                : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: DS.space.md, alignContent: 'start' } },
+                : h('div', {
+                  style: {
+                    flex: 1, minHeight: 0, overflowY: 'auto',
+                    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gridAutoRows: 'min-content', gap: DS.space.md, alignContent: 'start', alignItems: 'stretch',
+                  },
+                },
                   list.map(e => h(Card, {
                     key: e.id, pad: DS.space.md,
                     active: (batchMode && batchSelection.includes(e.id)) || (!batchMode && selectedId === e.id),
