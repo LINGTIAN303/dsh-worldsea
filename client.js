@@ -2142,8 +2142,9 @@ window.__ModuleLoader__.load({
 
       if (!editing) {
         return h('div', null,
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 } },
-            h(GhostButton, { small: true, onClick: onBack }, t('detail.back')),
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.md } },
+            h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } },
+              entity.updatedAt.slice(0, 10) + ' · ' + entity.id),
             h('div', { style: { flex: 1 } }),
             h(PrimaryButton, { small: true, onClick: () => actions.beginEdit(entity.id) }, t('detail.edit')),
             h(GhostButton, {
@@ -2151,22 +2152,17 @@ window.__ModuleLoader__.load({
               onClick: () => { if (window.confirm(t('detail.deleteConfirm').replace('{title}', entity.title))) actions.remove(entity.id); },
             }, t('detail.delete')),
           ),
-          h(Card, null,
-            h('div', { style: { fontSize: DS.font.xl, fontWeight: 600, marginBottom: 2 } }, entity.title),
-            h('div', { style: { fontSize: DS.font.sm, color: 'var(--dsw-alias-label-secondary)', marginBottom: 10 } },
-              entity.updatedAt.slice(0, 10) + ' · ' + entity.id),
-            h(TagsSection, { entity, actions, t }),
-            entity.description
-              ? h('div', { style: { fontSize: DS.font.md, marginBottom: 10, lineHeight: 1.6, whiteSpace: 'pre-wrap' } }, entity.description)
-              : null,
-            fields.map(f => h(FieldRow, {
-              key: f.key, field: f, value: entity.properties[f.key], editing: false,
-            })),
-          ),
+          h(TagsSection, { entity, actions, t }),
+          entity.description
+            ? h('div', { style: { fontSize: DS.font.md, marginBottom: DS.space.md, lineHeight: 1.6, whiteSpace: 'pre-wrap' } }, entity.description)
+            : null,
+          fields.map(f => h(FieldRow, {
+            key: f.key, field: f, value: entity.properties[f.key], editing: false,
+          })),
           // Facet 字段组（对齐 WorldSea WeaponFacet/ApparelFacet 挂宿主类型的语义）。
           FACET_FIELD_GROUPS.filter(g => g.hostType === entity.type).map(g =>
             h(FacetSection, { key: g.id, group: g, entity, actions, t })),
-          h('div', { style: { marginTop: 12 } },
+          h('div', { style: { marginTop: DS.space.md } },
             h(RelationsSection, { relations: allRelations, entities: allEntities, selfId: entity.id, customRelationTypes, actions, t })),
         );
       }
@@ -2667,20 +2663,41 @@ window.__ModuleLoader__.load({
                     ),
                   ))),
             );
-            // 详情右栏（对齐 WorldSea detail-carrier="column"：选中实体 → 列表旁开 560px 面板）。
+            // 详情右栏（对齐 WorldSea detail-carrier="column"：选中实体 → 列表旁开 560px 面板，
+            // 进场走 ws-fade 式宽度+透明度过渡）。
             return selected
               ? h('div', { style: { flex: 1, minWidth: 0, display: 'flex', gap: DS.space.md, minHeight: 0 } },
                 h('div', { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } }, workbenchBody),
-                h('div', {
-                  style: {
-                    flex: '0 0 560px', width: 560, boxSizing: 'border-box',
-                    overflowY: 'auto', alignSelf: 'stretch',
-                    background: 'var(--dsw-alias-bg-layer-1)',
-                    borderLeft: '1px solid var(--dsw-alias-border-l1)',
-                    borderRadius: DS.radius.md, padding: DS.space.lg,
-                  },
+                h('aside', {
+                  key: selected.id,
+                  className: 'ws-detail-column',
+                  style: { flex: '0 0 560px', width: 560, boxSizing: 'border-box' },
                 },
-                  h(EntityDetail, { useStore, actions, entity: selected, fields: typeDef.fields, allRelations: relations, allEntities: entities, customRelationTypes, t, onBack: () => actions.selectEntity(null) }),
+                  // 头部：图标 + 标题 + 类型标签（对齐 detail-header 插槽形态）
+                  h('div', {
+                    style: {
+                      display: 'flex', alignItems: 'center', gap: DS.space.md,
+                      padding: '0 0 ' + DS.space.md + 'px',
+                      borderBottom: '1px solid var(--dsw-alias-border-l1)',
+                      marginBottom: DS.space.lg,
+                    },
+                  },
+                    h('div', {
+                      style: {
+                        width: 36, height: 36, borderRadius: DS.radius.mid, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: DS.activeBg, color: 'var(--dsw-alias-brand-primary)',
+                      },
+                    }, h(TypeGlyph, { glyph: typeDef.glyph, size: 18 })),
+                    h('div', { style: { flex: 1, minWidth: 0 } },
+                      h('div', { style: { fontSize: DS.font.lg, fontWeight: 600, color: 'var(--dsw-alias-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected.title),
+                      h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)' } }, typeDef.label + ' · ' + selected.id),
+                    ),
+                    h(GhostButton, { small: true, onClick: () => actions.selectEntity(null) }, t('detail.back')),
+                  ),
+                  h('div', { className: 'ws-detail-scroll', style: { overflowY: 'auto', minHeight: 0 } },
+                    h(EntityDetail, { useStore, actions, entity: selected, fields: typeDef.fields, allRelations: relations, allEntities: entities, customRelationTypes, t }),
+                  ),
                 ),
               )
               : workbenchBody;
@@ -2716,6 +2733,10 @@ window.__ModuleLoader__.load({
           '[data-worldsea-ui] [data-narrow="1"] .ws-nav-label { display: none; }',
           '[data-worldsea-ui] [data-narrow="1"] .ws-nav-group { margin-bottom: ' + DS.space.sm + 'px !important; }',
           '[data-worldsea-ui] [data-narrow="1"] .ws-nav-row { justify-content: center; padding: 7px 6px; }',
+          // 详情右栏（对齐 ws-fade：进场 = 宽度+透明度+边框同时过渡；keyframes 播一次 0→560px）。
+          '@keyframes ws-detail-in { from { opacity: 0; flex-basis: 0; border-left-width: 0; } to { opacity: 1; flex-basis: 560px; border-left-width: 1px; } }',
+          '[data-worldsea-ui] .ws-detail-column { animation: ws-detail-in ' + DS.durFast + ' ' + DS.ease + '; overflow: hidden; display: flex; flex-direction: column; background: var(--dsw-alias-bg-layer-1); border-left: 1px solid var(--dsw-alias-border-l1); border-radius: ' + DS.radius.md + 'px; padding: ' + DS.space.lg + 'px; }',
+          '[data-worldsea-ui] .ws-detail-column .ws-detail-scroll { flex: 1; min-height: 0; }',
         ].join('\n');
         // 标记所有渲染根（右栏 tab 与 main 各一份），样式选择器才能命中本插件容器。
         const mark = () => {
