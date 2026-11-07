@@ -1232,6 +1232,24 @@ window.__ModuleLoader__.load({
       /** 大纲节点树形缩进。 */
       const indentStyle = (depth) => ({ paddingLeft: 8 + depth * 18 });
 
+      /** 大纲导出：层级缩进 Markdown 清单 + 各节点内容。 */
+      const exportOutline = () => {
+        const lines = ['# ' + t('writing.outline'), '', '>' + t('ms.exportedAt').replace('{date}', new Date().toISOString().slice(0, 10)), ''];
+        for (const { node, depth } of outlineRows) {
+          const mark = '#'.repeat(Math.min(6, depth + 2));
+          lines.push(mark + ' ' + node.title, '');
+          if (node.properties.storylines) lines.push('*' + t('writing.storylines') + ': ' + node.properties.storylines + '*', '');
+          if (node.properties.content) lines.push(node.properties.content, '');
+        }
+        const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'worldsea-outline-' + new Date().toISOString().slice(0, 10) + '.md';
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
       return h('div', { style: { display: 'grid', gridTemplateColumns: '280px 1fr', gap: 12, alignItems: 'start' } },
         // 左列：页签 + 列表
         h('div', null,
@@ -1273,7 +1291,7 @@ window.__ModuleLoader__.load({
                   h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
                     n.properties.noteType + ' · ' + ((n.properties.content || '').length) + ' 字'),
                 ))),
-            h('div', { style: { padding: '6px 4px 2px' } },
+            h('div', { style: { padding: '6px 4px 2px', display: 'flex', gap: 6 } },
               h(PrimaryButton, {
                 small: true,
                 onClick: () => {
@@ -1282,6 +1300,7 @@ window.__ModuleLoader__.load({
                   setSelectedId(null);
                 },
               }, tab === 'outline' ? t('writing.newNode') : t('writing.newNote')),
+              tab === 'outline' && outlineRows.length ? h(GhostButton, { small: true, onClick: exportOutline }, t('writing.exportOutline')) : null,
             ),
           ),
         ),
@@ -1353,6 +1372,24 @@ window.__ModuleLoader__.load({
         actions.createChapter(t('ms.newChapterTitle'), bookId || '');
       };
 
+      /** 整本书导出 Markdown（书名 + 各章节按创建序）。 */
+      const exportBook = (book) => {
+        const rows = chapterRows(book.id);
+        const lines = ['# ' + book.title, '', '>' + t('ms.exportedAt').replace('{date}', new Date().toISOString().slice(0, 10)), ''];
+        for (const c of rows) {
+          lines.push('## ' + c.title, '');
+          if (c.properties.volumeName) lines.push('*' + c.properties.volumeName + '*', '');
+          lines.push(c.properties.content || '', '');
+        }
+        const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'worldsea-book-' + book.title.slice(0, 12) + '-' + new Date().toISOString().slice(0, 10) + '.md';
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
       return h('div', { style: { display: 'grid', gridTemplateColumns: '300px 1fr', gap: 12, alignItems: 'start' } },
         // 左列：书籍分组
         h('div', null,
@@ -1365,6 +1402,10 @@ window.__ModuleLoader__.load({
               h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px' } },
                 h(TypeGlyph, { glyph: 'book', size: 13 }),
                 h('span', { style: { fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, b.title),
+                h('button', {
+                  onClick: () => exportBook(b),
+                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: 12 },
+                }, t('ms.exportBook')),
                 h('button', {
                   onClick: () => newChapter(b.id),
                   style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: 12 },
@@ -2552,6 +2593,9 @@ window.__ModuleLoader__.load({
       'ms.freeChapter': '自由章节',
       'ms.pick': '左侧选择章节后在此编辑正文。',
       'ms.volume': '卷名…',
+      'ms.exportBook': '导出',
+      'ms.exportedAt': '导出于 {date}',
+      'writing.exportOutline': '导出大纲',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -2677,6 +2721,9 @@ window.__ModuleLoader__.load({
       'ms.freeChapter': 'Free chapter',
       'ms.pick': 'Pick a chapter on the left to edit here.',
       'ms.volume': 'Volume…',
+      'ms.exportBook': 'Export',
+      'ms.exportedAt': 'Exported at {date}',
+      'writing.exportOutline': 'Export outline',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
