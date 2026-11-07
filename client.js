@@ -257,6 +257,18 @@ window.__ModuleLoader__.load({
       { key: 'condition', label: '状态', fieldType: 'select', options: ['未写', '草稿', '完成'] },
     ];
 
+    /** 手稿（WorldSea official.manuscript：book 容器 + manuscript 章节，bookId 归属）。 */
+    const BOOK_FIELDS = [
+      { key: 'volumeName', label: '所属卷名', fieldType: 'text' },
+      { key: 'author', label: '作者（世界内）', fieldType: 'text' },
+    ];
+    const MANUSCRIPT_FIELDS = [
+      { key: 'content', label: '正文（Markdown）', fieldType: 'textarea' },
+      { key: 'bookId', label: '所属书籍 ID', fieldType: 'text' },
+      { key: 'condition', label: '状态', fieldType: 'select', options: ['草稿', '修订中', '终稿'] },
+      { key: 'volumeName', label: '所属卷名', fieldType: 'text' },
+    ];
+
     /** 实体类型注册表（manifest 对齐 WorldSea 官方插件形态；15 类覆盖创作域主力，按域分组）。 */
     const ENTITY_TYPES = [
       { type: 'character', label: '角色', domain: 'life', fields: CHARACTER_FIELDS, glyph: 'user' },
@@ -277,6 +289,8 @@ window.__ModuleLoader__.load({
       { type: 'combat_stat', label: '战力体系', domain: 'arcane', fields: COMBAT_STAT_FIELDS, glyph: 'shield' },
       { type: 'notebook', label: '笔记', domain: 'knowledge', fields: NOTEBOOK_FIELDS, glyph: 'note' },
       { type: 'outline_node', label: '大纲节点', domain: 'history', fields: OUTLINE_NODE_FIELDS, glyph: 'tree' },
+      { type: 'book', label: '书籍', domain: 'history', fields: BOOK_FIELDS, glyph: 'book' },
+      { type: 'manuscript', label: '正文', domain: 'history', fields: MANUSCRIPT_FIELDS, glyph: 'manuscript' },
     ];
 
     /**
@@ -329,6 +343,8 @@ window.__ModuleLoader__.load({
       combat_stat: { title: '示例战力体系', properties: { system: '境界制', tier: 1, realm: '炼气一层', culture: '中式', } },
       notebook: { title: '示例笔记', properties: { noteType: 'markdown', content: '# 笔记\n\n自由记录设定灵感、考据与备忘。', } },
       outline_node: { title: '第一卷 开端', properties: { content: '开篇场景梗概…', condition: '未写', nodeType: 'chapter', } },
+      book: { title: '示例书籍', properties: { volumeName: '第一卷', } },
+      manuscript: { title: '第一章 启程', properties: { content: '第一章正文…', condition: '草稿', volumeName: '第一卷', } },
     };
 
     // ─────────────────────────────────────────────
@@ -556,6 +572,21 @@ window.__ModuleLoader__.load({
           if (!entity) return;
           entity.title = title;
           entity.updatedAt = new Date().toISOString();
+        },
+        /** 手稿章节：建章并归书（bookId 空串 = 未归书）。 */
+        createChapter(draft, title, bookId) {
+          const now = new Date().toISOString();
+          const entity = {
+            id: newEntityId(),
+            type: 'manuscript',
+            title: title || '未命名',
+            description: '',
+            properties: { condition: '草稿', ...(bookId ? { bookId } : {}) },
+            tags: [],
+            createdAt: now,
+            updatedAt: now,
+          };
+          draft.entities.push(entity);
         },
         /** 关系属性：备注（写入 relation.properties.note；非对称边两条独立记录，各写各的）。 */
         setRelationNote(draft, relationId, note) {
@@ -910,6 +941,14 @@ window.__ModuleLoader__.load({
             h('circle', { cx: 6, cy: 4, r: 2 }),
             h('circle', { cx: 18, cy: 16, r: 2 }),
             h('path', { d: 'M6 12v0' }));
+        case 'book':
+          return h('svg', common,
+            h('path', { d: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5z' }),
+            h('path', { d: 'M19 19H6a2 2 0 0 0-2 2M8 7h7' }));
+        case 'manuscript':
+          return h('svg', common,
+            h('rect', { x: 6, y: 3, width: 12, height: 18 }),
+            h('path', { d: 'M9 7h6M9 11h6M9 15h4' }));
         default:
           return h('svg', common, h('circle', { cx: 12, cy: 12, r: 8 }));
       }
@@ -1291,6 +1330,125 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * 手稿视图（对齐 official.manuscript：book 顶层容器 + manuscript 章节按 bookId 归组）。
+     * 左列 = 书籍分组章节列表；右列 = 章节正文编辑（标题/状态/正文即时写）+ 字数统计。
+     */
+    function ManuscriptView(props) {
+      const { entities, actions, t } = props;
+      const books = entities.filter(e => e.type === 'book');
+      const chapters = entities.filter(e => e.type === 'manuscript');
+      const [selectedId, setSelectedId] = React.useState(null);
+      const selected = chapters.find(c => c.id === selectedId) || null;
+      const contentLen = (selected?.properties.content || '').length;
+
+      /** 章节行（按当前书籍过滤）。
+       * @param bookId - 书籍 id；'' 表示未归书。
+       */
+      const chapterRows = (bookId) => chapters
+        .filter(c => (c.properties.bookId || '') === bookId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+      /** 新建章节（单 draft 内建章 + 归书，避免两步竞态）。 */
+      const newChapter = (bookId) => {
+        actions.createChapter(t('ms.newChapterTitle'), bookId || '');
+      };
+
+      return h('div', { style: { display: 'grid', gridTemplateColumns: '300px 1fr', gap: 12, alignItems: 'start' } },
+        // 左列：书籍分组
+        h('div', null,
+          h(Card, { pad: 8 },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 4px 8px' } },
+              h('div', { style: { fontSize: 13, fontWeight: 600, flex: 1 } }, t('ms.books') + ' (' + books.length + ')'),
+              h(PrimaryButton, { small: true, onClick: () => actions.create('book', t('ms.newBook')) }, t('ms.newBook')),
+            ),
+            books.map(b => h('div', { key: b.id, style: { marginBottom: 10 } },
+              h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px' } },
+                h(TypeGlyph, { glyph: 'book', size: 13 }),
+                h('span', { style: { fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, b.title),
+                h('button', {
+                  onClick: () => newChapter(b.id),
+                  style: { border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--dsw-alias-brand-primary)', fontSize: 12 },
+                }, '＋' + t('ms.chapter')),
+              ),
+              chapterRows(b.id).map(c => h('div', {
+                key: c.id,
+                onClick: () => setSelectedId(c.id),
+                style: {
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  marginLeft: 16, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginBottom: 2,
+                  background: selectedId === c.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                },
+              },
+                h('span', {
+                  style: { fontSize: 10, color: 'var(--dsw-alias-label-secondary)', width: 30 },
+                }, c.properties.condition || ''),
+                h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, c.title),
+                h('span', { style: { fontSize: 10, color: 'var(--dsw-alias-label-secondary)' } }, (c.properties.content || '').length),
+              )),
+            )),
+            // 未归书章节
+            chapterRows('').length ? h('div', null,
+              h('div', { style: { padding: '4px 6px', fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('ms.orphaned') + ' (' + chapterRows('').length + ')'),
+              chapterRows('').map(c => h('div', {
+                key: c.id,
+                onClick: () => setSelectedId(c.id),
+                style: {
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  marginLeft: 16, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginBottom: 2,
+                  background: selectedId === c.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                },
+              }, h('span', { style: { flex: 1 } }, c.title))),
+            ) : null,
+            h('div', { style: { padding: '4px 4px' } },
+              h(GhostButton, { small: true, onClick: () => newChapter('') }, '＋' + t('ms.freeChapter')),
+            ),
+          ),
+        ),
+        // 右列：章节编辑
+        h('div', null,
+          !selected
+            ? h(Card, { pad: 28 }, h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('ms.pick')))
+            : h(Card, { pad: 14 },
+              h('input', {
+                value: selected.title,
+                onChange: e => actions.renameEntity(selected.id, e.target.value),
+                style: { ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 8 },
+              }),
+              h('div', { style: { display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' } },
+                h('select', {
+                  value: selected.properties.condition || '草稿',
+                  onChange: e => actions.patchProperties(selected.id, 'condition', e.target.value),
+                  style: { ...inputStyle, width: 'auto' },
+                },
+                  ['草稿', '修订中', '终稿'].map(s => h('option', { key: s, value: s }, s))),
+                h('select', {
+                  value: selected.properties.bookId || '',
+                  onChange: e => actions.patchProperties(selected.id, 'bookId', e.target.value),
+                  style: { ...inputStyle, width: 'auto' },
+                },
+                  h('option', { value: '' }, t('ms.orphaned')),
+                  books.map(b => h('option', { key: b.id, value: b.id }, b.title))),
+                h('input', {
+                  value: selected.properties.volumeName || '',
+                  placeholder: t('ms.volume'),
+                  onChange: e => actions.patchProperties(selected.id, 'volumeName', e.target.value),
+                  style: { ...inputStyle, width: 130 },
+                }),
+                h('div', { style: { flex: 1 } }),
+                h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, t('writing.charCount').replace('{n}', String(contentLen))),
+              ),
+              h('textarea', {
+                value: selected.properties.content || '',
+                onChange: e => actions.patchProperties(selected.id, 'content', e.target.value),
+                rows: 20,
+                placeholder: t('writing.contentPlaceholder'),
+                style: { ...inputStyle, fontFamily: 'ui-monospace, monospace', lineHeight: 1.8, resize: 'vertical' },
+              }),
+            )),
+      );
+    }
+
+    /**
      * 设定集（对齐 official.codex：按语义域分章聚合阅读全部条目 + 整本导出）。
      * 分章 = 域（生命/地理/…/用户自定义类型的域）；导出 = Markdown 整本。
      */
@@ -1440,6 +1598,7 @@ window.__ModuleLoader__.load({
         language: '#4a90a4', concept: '#7f8fa6', faith: '#d4a017',
         culture: '#b565a7', conflict: '#d9534f', event: '#5bc0de',
         combat_stat: '#6c7ae0', notebook: '#55a888', outline_node: '#c98b3f',
+        book: '#8a6db1', manuscript: '#d0a45f',
       };
       const colorOf = e => TYPE_COLORS[e.type] || '#8a8f9d';
 
@@ -2095,9 +2254,10 @@ window.__ModuleLoader__.load({
             h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } }, s.label),
           ))),
         // 顶部页签：工作台 / 图谱 / 时间线 / 门户
-        h('div', { style: { display: 'flex', gap: 8, marginBottom: 16 } },
+        h('div', { style: { display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' } },
           h('button', { onClick: () => actions.setView('workbench'), style: pill(view === 'workbench') }, t('tab.workbench')),
           h('button', { onClick: () => actions.setView('writing'), style: pill(view === 'writing') }, t('tab.writing')),
+          h('button', { onClick: () => actions.setView('manuscript'), style: pill(view === 'manuscript') }, t('tab.manuscript')),
           h('button', { onClick: () => actions.setView('graph'), style: pill(view === 'graph') }, t('tab.graph')),
           h('button', { onClick: () => actions.setView('timeline'), style: pill(view === 'timeline') }, t('tab.timeline')),
           h('button', { onClick: () => actions.setView('codex'), style: pill(view === 'codex') }, t('tab.codex')),
@@ -2326,6 +2486,7 @@ window.__ModuleLoader__.load({
       'tab.health': '体检',
       'tab.codex': '设定集',
       'tab.writing': '写作',
+      'tab.manuscript': '手稿',
       'tab.portal': '门户',
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
       'graph.filter': '只看关系',
@@ -2383,6 +2544,14 @@ window.__ModuleLoader__.load({
       'writing.storylines': '线索…',
       'writing.contentPlaceholder': 'Markdown 正文…',
       'writing.charCount': '{n} 字',
+      'ms.books': '书籍',
+      'ms.newBook': '新建书',
+      'ms.chapter': '章',
+      'ms.newChapterTitle': '未命名章节',
+      'ms.orphaned': '未归书',
+      'ms.freeChapter': '自由章节',
+      'ms.pick': '左侧选择章节后在此编辑正文。',
+      'ms.volume': '卷名…',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -2442,6 +2611,7 @@ window.__ModuleLoader__.load({
       'tab.health': 'Health',
       'tab.codex': 'Codex',
       'tab.writing': 'Writing',
+      'tab.manuscript': 'Manuscript',
       'tab.portal': 'Portal',
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
       'graph.filter': 'Show relation',
@@ -2499,6 +2669,14 @@ window.__ModuleLoader__.load({
       'writing.storylines': 'Storylines…',
       'writing.contentPlaceholder': 'Markdown content…',
       'writing.charCount': '{n} chars',
+      'ms.books': 'Books',
+      'ms.newBook': 'New book',
+      'ms.chapter': 'chapter',
+      'ms.newChapterTitle': 'Untitled chapter',
+      'ms.orphaned': 'Unfiled',
+      'ms.freeChapter': 'Free chapter',
+      'ms.pick': 'Pick a chapter on the left to edit here.',
+      'ms.volume': 'Volume…',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
