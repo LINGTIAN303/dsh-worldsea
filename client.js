@@ -240,6 +240,23 @@ window.__ModuleLoader__.load({
       { key: 'significance', label: '意义', fieldType: 'textarea' },
     ];
 
+    /** 笔记（WorldSea official.notebook ownFields + narrative trait 的 content 摊平）。 */
+    const NOTEBOOK_FIELDS = [
+      { key: 'content', label: '正文（Markdown）', fieldType: 'textarea' },
+      { key: 'noteType', label: '笔记类型', fieldType: 'select', options: ['markdown', 'code', 'reference'] },
+      { key: 'codeLanguage', label: '代码语言', fieldType: 'text' },
+    ];
+
+    /** 大纲节点（WorldSea official.outline outline_node：parentId 树形 + 线索 + 预估字数）。 */
+    const OUTLINE_NODE_FIELDS = [
+      { key: 'content', label: '内容（Markdown）', fieldType: 'textarea' },
+      { key: 'parentId', label: '父节点 ID', fieldType: 'text' },
+      { key: 'storylines', label: '所属线索', fieldType: 'text' },
+      { key: 'wordCount', label: '字数（预估）', fieldType: 'number' },
+      { key: 'nodeType', label: '节点类型', fieldType: 'select', options: ['chapter', 'scene', 'beat', 'note'] },
+      { key: 'condition', label: '状态', fieldType: 'select', options: ['未写', '草稿', '完成'] },
+    ];
+
     /** 实体类型注册表（manifest 对齐 WorldSea 官方插件形态；15 类覆盖创作域主力，按域分组）。 */
     const ENTITY_TYPES = [
       { type: 'character', label: '角色', domain: 'life', fields: CHARACTER_FIELDS, glyph: 'user' },
@@ -258,6 +275,8 @@ window.__ModuleLoader__.load({
       { type: 'conflict', label: '冲突', domain: 'history', fields: CONFLICT_FIELDS, glyph: 'swords' },
       { type: 'event', label: '事件', domain: 'history', fields: EVENT_FIELDS, glyph: 'clock' },
       { type: 'combat_stat', label: '战力体系', domain: 'arcane', fields: COMBAT_STAT_FIELDS, glyph: 'shield' },
+      { type: 'notebook', label: '笔记', domain: 'knowledge', fields: NOTEBOOK_FIELDS, glyph: 'note' },
+      { type: 'outline_node', label: '大纲节点', domain: 'history', fields: OUTLINE_NODE_FIELDS, glyph: 'tree' },
     ];
 
     /**
@@ -308,6 +327,8 @@ window.__ModuleLoader__.load({
       conflict: { title: '示例冲突', properties: { conflictType: '局部冲突', scale: '区域', } },
       event: { title: '示例事件', properties: { date: '元年 春', importance: '关键', status: '正史', } },
       combat_stat: { title: '示例战力体系', properties: { system: '境界制', tier: 1, realm: '炼气一层', culture: '中式', } },
+      notebook: { title: '示例笔记', properties: { noteType: 'markdown', content: '# 笔记\n\n自由记录设定灵感、考据与备忘。', } },
+      outline_node: { title: '第一卷 开端', properties: { content: '开篇场景梗概…', condition: '未写', nodeType: 'chapter', } },
     };
 
     // ─────────────────────────────────────────────
@@ -527,6 +548,13 @@ window.__ModuleLoader__.load({
           if (!entity) return;
           if (value === '' || value === undefined) delete entity.properties[key];
           else entity.properties[key] = value;
+          entity.updatedAt = new Date().toISOString();
+        },
+        /** 标题改名（写作视图正文页头部用）。 */
+        renameEntity(draft, id, title) {
+          const entity = draft.entities.find(e => e.id === id);
+          if (!entity) return;
+          entity.title = title;
           entity.updatedAt = new Date().toISOString();
         },
         /** 关系属性：备注（写入 relation.properties.note；非对称边两条独立记录，各写各的）。 */
@@ -872,6 +900,16 @@ window.__ModuleLoader__.load({
           return h('svg', common,
             h('path', { d: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z' }),
             h('path', { d: 'M4 7.5 12 12l8-4.5M12 12v9' }));
+        case 'note':
+          return h('svg', common,
+            h('rect', { x: 5, y: 3, width: 14, height: 18 }),
+            h('path', { d: 'M9 8h6M9 12h6M9 16h3' }));
+        case 'tree':
+          return h('svg', common,
+            h('path', { d: 'M6 4v8a4 4 0 0 0 4 4h8' }),
+            h('circle', { cx: 6, cy: 4, r: 2 }),
+            h('circle', { cx: 18, cy: 16, r: 2 }),
+            h('path', { d: 'M6 12v0' }));
         default:
           return h('svg', common, h('circle', { cx: 12, cy: 12, r: 8 }));
       }
@@ -1111,6 +1149,148 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * 写作视图（对齐 notebook/outline 核心工作流）：
+     * 左列 = 大纲树（outline_node 按 parentId 缩进）与笔记列表（notebook）；
+     * 右列 = 选中项的正文编辑（Markdown textarea 即时写）。
+     */
+    function WritingView(props) {
+      const { entities, actions, t } = props;
+      /** 本视图自己的页签样式（与 Workbench.pill 同款）。 */
+      const pill = (active) => ({
+        padding: '5px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 13,
+        background: active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-1)',
+        color: active ? '#fff' : 'var(--dsw-alias-label-primary)',
+      });
+      const [tab, setTab] = React.useState('outline');
+      const [selectedId, setSelectedId] = React.useState(null);
+
+      const nodes = entities.filter(e => e.type === 'outline_node');
+      const notes = entities.filter(e => e.type === 'notebook');
+      const pool = tab === 'outline' ? nodes : notes;
+      const selected = pool.find(e => e.id === selectedId) || null;
+
+      /** 大纲树行：按 parentId 递归生成缩进行（order 排序；环/父丢失节点兜底在末尾）。 */
+      const outlineRows = (() => {
+        const byParent = new Map();
+        for (const n of nodes) {
+          const pid = n.properties.parentId || '';
+          if (!byParent.has(pid)) byParent.set(pid, []);
+          byParent.get(pid).push(n);
+        }
+        const rows = [];
+        const walk = (pid, depth) => {
+          for (const n of (byParent.get(pid) || []).sort((a, b) => (a.properties.order || 0) - (b.properties.order || 0))) {
+            rows.push({ node: n, depth });
+            walk(n.id, depth + 1);
+          }
+        };
+        walk('', 0);
+        const walked = new Set(rows.map(r => r.node.id));
+        for (const n of nodes) if (!walked.has(n.id)) rows.push({ node: n, depth: 0 });
+        return rows;
+      })();
+
+      /** 大纲节点树形缩进。 */
+      const indentStyle = (depth) => ({ paddingLeft: 8 + depth * 18 });
+
+      return h('div', { style: { display: 'grid', gridTemplateColumns: '280px 1fr', gap: 12, alignItems: 'start' } },
+        // 左列：页签 + 列表
+        h('div', null,
+          h('div', { style: { display: 'flex', gap: 6, marginBottom: 8 } },
+            h('button', { onClick: () => { setTab('outline'); setSelectedId(null); }, style: pill(tab === 'outline') }, t('writing.outline') + ' (' + nodes.length + ')'),
+            h('button', { onClick: () => { setTab('notes'); setSelectedId(null); }, style: pill(tab === 'notes') }, t('writing.notes') + ' (' + notes.length + ')'),
+          ),
+          h(Card, { pad: 8 },
+            tab === 'outline'
+              ? (outlineRows.length === 0
+                ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', padding: 8 } }, t('writing.emptyOutline'))
+                : outlineRows.map(({ node, depth }) => h('div', {
+                  key: node.id,
+                  onClick: () => setSelectedId(node.id),
+                  style: {
+                    ...indentStyle(depth),
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                    marginBottom: 2,
+                    background: selectedId === node.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                    fontWeight: depth === 0 ? 600 : 400,
+                  },
+                },
+                  h('span', { style: { fontSize: 10, color: 'var(--dsw-alias-label-secondary)' } },
+                    node.properties.condition || ''),
+                  h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, node.title),
+                )))
+              : (notes.length === 0
+                ? h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', padding: 8 } }, t('writing.emptyNotes'))
+                : notes.map(n => h('div', {
+                  key: n.id,
+                  onClick: () => setSelectedId(n.id),
+                  style: {
+                    padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginBottom: 2,
+                    background: selectedId === n.id ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                  },
+                },
+                  h('div', { style: { fontWeight: 600 } }, n.title),
+                  h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
+                    n.properties.noteType + ' · ' + ((n.properties.content || '').length) + ' 字'),
+                ))),
+            h('div', { style: { padding: '6px 4px 2px' } },
+              h(PrimaryButton, {
+                small: true,
+                onClick: () => {
+                  const type = tab === 'outline' ? 'outline_node' : 'notebook';
+                  actions.create(type, t('writing.untitled'));
+                  setSelectedId(null);
+                },
+              }, tab === 'outline' ? t('writing.newNode') : t('writing.newNote')),
+            ),
+          ),
+        ),
+        // 右列：正文编辑
+        h('div', null,
+          !selected
+            ? h(Card, { pad: 28 }, h('div', { style: { textAlign: 'center', color: 'var(--dsw-alias-label-secondary)', fontSize: 13 } }, t('writing.pick')))
+            : h(Card, { pad: 14 },
+              h('input', {
+                value: selected.title,
+                onChange: e => actions.renameEntity(selected.id, e.target.value),
+                style: { ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 8 },
+              }),
+              tab === 'outline' ? h('div', { style: { display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' } },
+                h('select', {
+                  value: selected.properties.parentId || '',
+                  onChange: e => actions.patchProperties(selected.id, 'parentId', e.target.value),
+                  style: { ...inputStyle, width: 'auto' },
+                },
+                  h('option', { value: '' }, t('writing.rootNode')),
+                  nodes.filter(n => n.id !== selected.id).map(n => h('option', { key: n.id, value: n.id }, n.title))),
+                h('select', {
+                  value: selected.properties.condition || '未写',
+                  onChange: e => actions.patchProperties(selected.id, 'condition', e.target.value),
+                  style: { ...inputStyle, width: 'auto' },
+                },
+                  ['未写', '草稿', '完成'].map(s => h('option', { key: s, value: s }, s))),
+                h('input', {
+                  value: selected.properties.storylines || '',
+                  placeholder: t('writing.storylines'),
+                  onChange: e => actions.patchProperties(selected.id, 'storylines', e.target.value),
+                  style: { ...inputStyle, width: 140 },
+                }),
+              ) : null,
+              h('textarea', {
+                value: selected.properties.content || '',
+                onChange: e => actions.patchProperties(selected.id, 'content', e.target.value),
+                rows: 18,
+                placeholder: t('writing.contentPlaceholder'),
+                style: { ...inputStyle, fontFamily: 'ui-monospace, monospace', lineHeight: 1.7, resize: 'vertical' },
+              }),
+              h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
+                t('writing.charCount').replace('{n}', String((selected.properties.content || '').length))),
+            )),
+      );
+    }
+
+    /**
      * 设定集（对齐 official.codex：按语义域分章聚合阅读全部条目 + 整本导出）。
      * 分章 = 域（生命/地理/…/用户自定义类型的域）；导出 = Markdown 整本。
      */
@@ -1259,7 +1439,7 @@ window.__ModuleLoader__.load({
         building: '#8d7355', creature: '#c0653a', plant: '#5f9e4c',
         language: '#4a90a4', concept: '#7f8fa6', faith: '#d4a017',
         culture: '#b565a7', conflict: '#d9534f', event: '#5bc0de',
-        combat_stat: '#6c7ae0',
+        combat_stat: '#6c7ae0', notebook: '#55a888', outline_node: '#c98b3f',
       };
       const colorOf = e => TYPE_COLORS[e.type] || '#8a8f9d';
 
@@ -1917,6 +2097,7 @@ window.__ModuleLoader__.load({
         // 顶部页签：工作台 / 图谱 / 时间线 / 门户
         h('div', { style: { display: 'flex', gap: 8, marginBottom: 16 } },
           h('button', { onClick: () => actions.setView('workbench'), style: pill(view === 'workbench') }, t('tab.workbench')),
+          h('button', { onClick: () => actions.setView('writing'), style: pill(view === 'writing') }, t('tab.writing')),
           h('button', { onClick: () => actions.setView('graph'), style: pill(view === 'graph') }, t('tab.graph')),
           h('button', { onClick: () => actions.setView('timeline'), style: pill(view === 'timeline') }, t('tab.timeline')),
           h('button', { onClick: () => actions.setView('codex'), style: pill(view === 'codex') }, t('tab.codex')),
@@ -1955,7 +2136,9 @@ window.__ModuleLoader__.load({
             ? h(GraphView, { entities, relations, actions, t })
             : view === 'timeline'
               ? h(TimelineView, { entities, actions, t })
-              : view === 'codex'
+              : view === 'writing'
+                ? h(WritingView, { entities, actions, t })
+                : view === 'codex'
                 ? h(CodexView, { entities, allTypes, t })
                 : view === 'health'
                 ? h(HealthView, { entities, relations, actions, t })
@@ -2142,6 +2325,7 @@ window.__ModuleLoader__.load({
       'tab.timeline': '时间线',
       'tab.health': '体检',
       'tab.codex': '设定集',
+      'tab.writing': '写作',
       'tab.portal': '门户',
       'graph.empty': '暂无实体可绘图；先到「工作台」新建。',
       'graph.filter': '只看关系',
@@ -2187,6 +2371,18 @@ window.__ModuleLoader__.load({
       'codex.exportedAt': '导出于 {date}',
       'codex.tags': '标签',
       'codex.empty': '暂无内容；先到「工作台」创建实体。',
+      'writing.outline': '大纲',
+      'writing.notes': '笔记',
+      'writing.emptyOutline': '大纲为空；点下方「新建节点」。',
+      'writing.emptyNotes': '无笔记；点下方「新建笔记」。',
+      'writing.newNode': '新建节点',
+      'writing.newNote': '新建笔记',
+      'writing.untitled': '未命名',
+      'writing.pick': '左侧选择条目后在此编辑正文。',
+      'writing.rootNode': '（根节点）',
+      'writing.storylines': '线索…',
+      'writing.contentPlaceholder': 'Markdown 正文…',
+      'writing.charCount': '{n} 字',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -2245,6 +2441,7 @@ window.__ModuleLoader__.load({
       'tab.timeline': 'Timeline',
       'tab.health': 'Health',
       'tab.codex': 'Codex',
+      'tab.writing': 'Writing',
       'tab.portal': 'Portal',
       'graph.empty': 'No entities to draw yet; create some in the workbench first.',
       'graph.filter': 'Show relation',
@@ -2290,6 +2487,18 @@ window.__ModuleLoader__.load({
       'codex.exportedAt': 'Exported at {date}',
       'codex.tags': 'Tags',
       'codex.empty': 'Nothing to compile yet; create entities in the workbench first.',
+      'writing.outline': 'Outline',
+      'writing.notes': 'Notes',
+      'writing.emptyOutline': 'Outline is empty; click "New node" below.',
+      'writing.emptyNotes': 'No notes; click "New note" below.',
+      'writing.newNode': 'New node',
+      'writing.newNote': 'New note',
+      'writing.untitled': 'Untitled',
+      'writing.pick': 'Pick an entry on the left to edit its content here.',
+      'writing.rootNode': '(root)',
+      'writing.storylines': 'Storylines…',
+      'writing.contentPlaceholder': 'Markdown content…',
+      'writing.charCount': '{n} chars',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
