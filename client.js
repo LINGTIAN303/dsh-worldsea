@@ -1318,12 +1318,6 @@ window.__ModuleLoader__.load({
      */
     function WritingView(props) {
       const { entities, actions, t } = props;
-      /** 本视图自己的页签样式（与 Workbench.pill 同款）。 */
-      const pill = (active) => ({
-        padding: '5px 14px', borderRadius: DS.radius.pill, border: 'none', cursor: 'pointer', fontSize: DS.font.md,
-        background: active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-bg-layer-1)',
-        color: active ? '#fff' : 'var(--dsw-alias-label-primary)',
-      });
       const [tab, setTab] = React.useState('outline');
       const [selectedId, setSelectedId] = React.useState(null);
 
@@ -1374,13 +1368,33 @@ window.__ModuleLoader__.load({
         URL.revokeObjectURL(url);
       };
 
-      return h('div', { style: { display: 'grid', gridTemplateColumns: '280px 1fr', gap: 12, alignItems: 'start' } },
+      return h('div', { style: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' } },
+        // 随流工具条（对齐 ViewToolbar：页签 + 弹性 + 新建）
+        h('div', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: DS.space.sm,
+            padding: '0 ' + DS.space.md + 'px', height: 44, flexShrink: 0,
+            background: 'var(--dsw-alias-bg-layer-1)',
+            border: '1px solid var(--dsw-alias-border-l1)',
+            borderRadius: DS.radius.md, marginBottom: DS.space.md,
+          },
+        },
+          h('button', { onClick: () => { setTab('outline'); setSelectedId(null); }, style: { ...dsControlBase, padding: '4px 10px', borderRadius: DS.radius.sm, border: 'none', background: tab === 'outline' ? DS.activeBg : 'transparent', color: tab === 'outline' ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-secondary)', fontSize: DS.font.sm, cursor: 'pointer', fontWeight: tab === 'outline' ? 600 : 400 } }, t('writing.outline') + ' (' + nodes.length + ')'),
+          h('button', { onClick: () => { setTab('notes'); setSelectedId(null); }, style: { ...dsControlBase, padding: '4px 10px', borderRadius: DS.radius.sm, border: 'none', background: tab === 'notes' ? DS.activeBg : 'transparent', color: tab === 'notes' ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-secondary)', fontSize: DS.font.sm, cursor: 'pointer', fontWeight: tab === 'notes' ? 600 : 400 } }, t('writing.notes') + ' (' + notes.length + ')'),
+          h('div', { style: { flex: 1 } }),
+          h(PrimaryButton, {
+            small: true,
+            onClick: () => {
+              const type = tab === 'outline' ? 'outline_node' : 'notebook';
+              actions.create(type, t('writing.untitled'));
+              setSelectedId(null);
+            },
+          }, tab === 'outline' ? t('writing.newNode') : t('writing.newNote')),
+        ),
+        // 主体：左列表 + 右编辑（WorldSea split 语义）
+        h('div', { style: { flex: 1, minHeight: 0, display: 'flex', gap: DS.space.md, alignItems: 'stretch' } },
         // 左列：页签 + 列表
-        h('div', null,
-          h('div', { style: { display: 'flex', gap: 6, marginBottom: 8 } },
-            h('button', { onClick: () => { setTab('outline'); setSelectedId(null); }, style: pill(tab === 'outline') }, t('writing.outline') + ' (' + nodes.length + ')'),
-            h('button', { onClick: () => { setTab('notes'); setSelectedId(null); }, style: pill(tab === 'notes') }, t('writing.notes') + ' (' + notes.length + ')'),
-          ),
+        h('div', { style: { width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
           h(Card, { pad: 8 },
             tab === 'outline'
               ? (outlineRows.length === 0
@@ -1416,29 +1430,21 @@ window.__ModuleLoader__.load({
                     n.properties.noteType + ' · ' + ((n.properties.content || '').length) + ' 字'),
                 ))),
             h('div', { style: { padding: '6px 4px 2px', display: 'flex', gap: 6 } },
-              h(PrimaryButton, {
-                small: true,
-                onClick: () => {
-                  const type = tab === 'outline' ? 'outline_node' : 'notebook';
-                  actions.create(type, t('writing.untitled'));
-                  setSelectedId(null);
-                },
-              }, tab === 'outline' ? t('writing.newNode') : t('writing.newNote')),
               tab === 'outline' && outlineRows.length ? h(GhostButton, { small: true, onClick: exportOutline }, t('writing.exportOutline')) : null,
             ),
           ),
         ),
         // 右列：正文编辑
-        h('div', null,
+        h('div', { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
           !selected
             ? h(EmptyState, null, t('writing.pick'))
-            : h(Card, { pad: 14 },
+            : h(Card, { pad: DS.space.lg, style: undefined },
               h('input', {
                 value: selected.title,
                 onChange: e => actions.renameEntity(selected.id, e.target.value),
-                style: { ...inputStyle, fontSize: DS.font.xl, fontWeight: 600, marginBottom: 8 },
+                style: { ...inputStyle, fontSize: DS.font.xl, fontWeight: 600, marginBottom: DS.space.sm },
               }),
-              tab === 'outline' ? h('div', { style: { display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' } },
+              tab === 'outline' ? h('div', { style: { display: 'flex', gap: DS.space.sm, marginBottom: DS.space.sm, flexWrap: 'wrap' } },
                 h('select', {
                   value: selected.properties.parentId || '',
                   onChange: e => actions.patchProperties(selected.id, 'parentId', e.target.value),
@@ -1464,11 +1470,12 @@ window.__ModuleLoader__.load({
                 onChange: e => actions.patchProperties(selected.id, 'content', e.target.value),
                 rows: 18,
                 placeholder: t('writing.contentPlaceholder'),
-                style: { ...inputStyle, fontFamily: 'ui-monospace, monospace', lineHeight: 1.7, resize: 'vertical' },
+                style: { ...inputStyle, fontFamily: 'ui-monospace, monospace', lineHeight: 1.7, resize: 'vertical', minHeight: 0 },
               }),
-              h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', marginTop: 6 } },
+              h('div', { style: { fontSize: DS.font.xs, color: 'var(--dsw-alias-label-secondary)', marginTop: DS.space.sm } },
                 t('writing.charCount').replace('{n}', String((selected.properties.content || '').length))),
             )),
+        ),
       );
     }
 
@@ -1514,14 +1521,26 @@ window.__ModuleLoader__.load({
         URL.revokeObjectURL(url);
       };
 
-      return h('div', { style: { display: 'grid', gridTemplateColumns: '300px 1fr', gap: 12, alignItems: 'start' } },
+      return h('div', { style: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' } },
+        // 随流工具条（对齐 ViewToolbar：标题 + 弹性 + 新建书）
+        h('div', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: DS.space.sm,
+            padding: '0 ' + DS.space.md + 'px', height: 44, flexShrink: 0,
+            background: 'var(--dsw-alias-bg-layer-1)',
+            border: '1px solid var(--dsw-alias-border-l1)',
+            borderRadius: DS.radius.md, marginBottom: DS.space.md,
+          },
+        },
+          h(TypeGlyph, { glyph: 'manuscript', size: 14 }),
+          h('span', { style: { fontSize: DS.font.sm, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' } }, t('ms.books') + ' (' + books.length + ')'),
+          h('div', { style: { flex: 1 } }),
+          h(PrimaryButton, { small: true, onClick: () => actions.create('book', t('ms.newBook')) }, t('ms.newBook')),
+        ),
+        // 主体双栏
+        h('div', { style: { flex: 1, minHeight: 0, display: 'flex', gap: DS.space.md, alignItems: 'stretch' } },
         // 左列：书籍分组
-        h('div', null,
-          h(Card, { pad: 8 },
-            h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 4px 8px' } },
-              h('div', { style: { fontSize: DS.font.md, fontWeight: 600, flex: 1 } }, t('ms.books') + ' (' + books.length + ')'),
-              h(PrimaryButton, { small: true, onClick: () => actions.create('book', t('ms.newBook')) }, t('ms.newBook')),
-            ),
+        h('div', { style: { width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' } },
             books.map(b => h('div', { key: b.id, style: { marginBottom: 10 } },
               h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px' } },
                 h(TypeGlyph, { glyph: 'book', size: 13 }),
@@ -1570,16 +1589,16 @@ window.__ModuleLoader__.load({
           ),
         ),
         // 右列：章节编辑
-        h('div', null,
+        h('div', { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
           !selected
             ? h(EmptyState, null, t('ms.pick'))
-            : h(Card, { pad: 14 },
+            : h(Card, { pad: DS.space.lg },
               h('input', {
                 value: selected.title,
                 onChange: e => actions.renameEntity(selected.id, e.target.value),
-                style: { ...inputStyle, fontSize: DS.font.xl, fontWeight: 600, marginBottom: 8 },
+                style: { ...inputStyle, fontSize: DS.font.xl, fontWeight: 600, marginBottom: DS.space.sm },
               }),
-              h('div', { style: { display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' } },
+              h('div', { style: { display: 'flex', gap: DS.space.sm, marginBottom: DS.space.sm, flexWrap: 'wrap', alignItems: 'center' } },
                 h('select', {
                   value: selected.properties.condition || '草稿',
                   onChange: e => actions.patchProperties(selected.id, 'condition', e.target.value),
