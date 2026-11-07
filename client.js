@@ -1943,7 +1943,7 @@ window.__ModuleLoader__.load({
      * 分章 = 域（生命/地理/…/用户自定义类型的域）；导出 = Markdown 整本。
      */
     function CodexView(props) {
-      const { entities, allTypes, t } = props;
+      const { entities, allTypes, actions, t } = props;
       const [chapter, setChapter] = React.useState('');
 
       /** 域 → 该域全部实体（按类型再分组）。 */
@@ -1954,7 +1954,7 @@ window.__ModuleLoader__.load({
           .map(def => ({ def, items: entities.filter(e => e.type === def.type) }))
           .filter(g => g.items.length > 0),
       })).filter(c => c.groups.length > 0);
-      const active = chapters.find(c => c.domain.id === chapter) || chapters[0];
+      const total = chapters.reduce((n, c) => n + c.groups.reduce((m, g) => m + g.items.length, 0), 0);
 
       /** 整本导出 Markdown。 */
       const exportMarkdown = () => {
@@ -1982,33 +1982,110 @@ window.__ModuleLoader__.load({
         URL.revokeObjectURL(url);
       };
 
-      return h('div', null,
-        h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' } },
-          h('select', {
-            value: active ? active.domain.id : '',
-            onChange: e => setChapter(e.target.value),
-            style: { ...inputStyle, width: 'auto', padding: '4px 10px', fontSize: DS.font.md },
+      /** 章节锚点跳转。 */
+      const jump = (id) => {
+        setChapter(id);
+        const el = document.getElementById('codex-ch-' + id);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+
+      /** 条目行（紧凑聚合：标题 + 描述摘要 + 字段摘要 chips，点击进详情）。 */
+      const entryRow = (def, e) => {
+        const fieldSummary = def.fields
+          .filter(f => e.properties[f.key] !== undefined && e.properties[f.key] !== '' && f.fieldType !== 'textarea')
+          .slice(0, 3);
+        return h('div', {
+          key: e.id,
+          onClick: () => { actions.selectType(e.type); actions.selectEntity(e.id); actions.setView('workbench'); },
+          style: {
+            ...dsControlBase, cursor: 'pointer',
+            padding: DS.space.md, borderRadius: DS.radius.mid,
+            background: 'var(--ws-bg-surface)', border: '1px solid var(--ws-border)',
           },
-            chapters.map(c => h('option', { key: c.domain.id, value: c.domain.id },
-              c.domain.label + '（' + c.groups.reduce((n, g) => n + g.items.length, 0) + '）'))),
+          onMouseOver: e2 => { e2.currentTarget.style.borderColor = 'var(--ws-border-strong)'; },
+          onMouseOut: e2 => { e2.currentTarget.style.borderColor = 'var(--ws-border)'; },
+        },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm } },
+            h(WsIcon, { name: def.glyph, size: 13 }),
+            h('span', { style: { fontSize: DS.font.base, fontWeight: 600, color: 'var(--ws-text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, e.title),
+            e.tags.map(tag => h('span', {
+              key: tag,
+              style: {
+                padding: '1px 8px', borderRadius: DS.radius.pill, fontSize: DS.font.x2s,
+                background: 'var(--ws-bg-muted)', color: 'var(--ws-text-secondary)',
+              },
+            }, tag)),
+          ),
+          e.description ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginTop: DS.space.xs, lineHeight: 1.6 } }, e.description.slice(0, 100) + (e.description.length > 100 ? '…' : '')) : null,
+          fieldSummary.length ? h('div', { style: { display: 'flex', gap: DS.space.md, marginTop: DS.space.xs, flexWrap: 'wrap' } },
+            fieldSummary.map(f => h('span', { key: f.key, style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)' } },
+              f.label + ': ' + String(e.properties[f.key]).slice(0, 30)))) : null,
+        );
+      };
+
+      return h('div', { style: { display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' } },
+        // 随流工具条（条目总数 + 弹性 + 导出）。
+        h('div', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: DS.space.sm,
+            padding: '0 ' + DS.space.md + 'px', height: 44, flexShrink: 0,
+            background: 'var(--ws-bg-surface)', border: '1px solid var(--ws-border)',
+            borderRadius: DS.radius.md, marginBottom: DS.space.md,
+          },
+        },
+          h(WsIcon, { name: 'book', size: 15 }),
+          h('span', { style: { fontSize: DS.font.sm, fontWeight: 600, color: 'var(--ws-text-primary)' } }, t('codex.title')),
+          h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)' } }, t('codex.total').replace('{n}', String(total))),
           h('div', { style: { flex: 1 } }),
           h(PrimaryButton, { small: true, onClick: exportMarkdown }, t('codex.export')),
         ),
-        !active
+        total === 0
           ? h(EmptyState, null, t('codex.empty'))
-          : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } },
-            active.groups.map(g => h(Card, { key: g.def.type, pad: 14 },
-              h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 } },
-                h(WsIcon, { name: g.def.glyph, size: 16 }),
-                h('div', { style: { fontSize: DS.font.lg, fontWeight: 700 } }, g.def.label),
-                h('span', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, '× ' + g.items.length),
-              ),
-              g.items.map(e => h('div', { key: e.id, style: { padding: '8px 0', borderTop: '1px solid var(--ws-border)' } },
-                h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600 } }, e.title),
-                e.description ? h('div', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)', marginTop: 2, whiteSpace: 'pre-wrap' } }, e.description.slice(0, 120)) : null,
-                e.tags.length ? h('div', { style: { fontSize: DS.font.xs, color: 'var(--ws-accent)', marginTop: 2 } }, e.tags.join(' · ')) : null,
+          : h('div', { style: { flex: 1, minHeight: 0, display: 'flex', gap: DS.space.md, alignItems: 'stretch' } },
+            // 左：章节导航（粘性）。
+            h('div', { style: { width: 180, flexShrink: 0 } },
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, position: 'sticky', top: 0 } },
+                chapters.map(c => {
+                  const n = c.groups.reduce((m, g) => m + g.items.length, 0);
+                  const active = chapter === c.domain.id;
+                  return h('div', {
+                    key: c.domain.id,
+                    onClick: () => jump(c.domain.id),
+                    style: {
+                      ...dsControlBase, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: DS.space.sm,
+                      padding: '6px 8px', borderRadius: DS.radius.sm, fontSize: DS.font.sm,
+                      background: active ? DS.activeBg : 'transparent',
+                      color: active ? 'var(--ws-accent)' : 'var(--ws-text-secondary)',
+                      fontWeight: active ? 500 : 400,
+                    },
+                  },
+                    h(WsIcon, { name: c.domain.glyph, size: 13 }),
+                    h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, c.domain.label),
+                    h('span', { style: { fontSize: DS.font.x2s, color: 'var(--ws-text-muted)', fontVariantNumeric: 'tabular-nums' } }, String(n)),
+                  );
+                })),
+            ),
+            // 右：分章聚合正文（域章头 → 类型小节 → 条目行）。
+            h('div', { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: DS.space.xl } },
+              chapters.map(c => h('div', { key: c.domain.id, id: 'codex-ch-' + c.domain.id },
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.md, paddingBottom: DS.space.sm, borderBottom: '1px solid var(--ws-border)' } },
+                  h(WsIcon, { name: c.domain.glyph, size: 16 }),
+                  h('span', { style: { fontSize: DS.font.lg, fontWeight: 700, color: 'var(--ws-text-primary)' } }, c.domain.label),
+                  h('span', { style: { fontSize: DS.font.xs, color: 'var(--ws-text-muted)' } }, '· ' + c.groups.length + ' ' + t('codex.groupsUnit')),
+                ),
+                c.groups.map(g => h('div', { key: g.def.type, style: { marginBottom: DS.space.lg } },
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: DS.space.sm, marginBottom: DS.space.sm } },
+                    h('span', { style: { fontSize: DS.font.md, fontWeight: 600, color: 'var(--ws-text-secondary)' } }, g.def.label),
+                    h('span', { style: { fontSize: DS.font.x2s, color: 'var(--ws-text-muted)' } }, '× ' + g.items.length),
+                  ),
+                  h('div', { style: { display: 'flex', flexDirection: 'column', gap: DS.space.sm } },
+                    g.items.map(e => entryRow(g.def, e)),
+                  ),
+                )),
               )),
-            ))),
+            ),
+          ),
       );
     }
 
@@ -2956,7 +3033,7 @@ window.__ModuleLoader__.load({
               : view === 'writing'
                 ? h(WritingView, { entities, actions, t })
                 : view === 'codex'
-                ? h(CodexView, { entities, allTypes, t })
+                ? h(CodexView, { entities, allTypes, actions, t })
                 : view === 'health'
                 ? h(HealthView, { entities, relations, actions, t })
                 : (() => {
@@ -3304,6 +3381,9 @@ window.__ModuleLoader__.load({
       'codex.exportedAt': '导出于 {date}',
       'codex.tags': '标签',
       'codex.empty': '暂无内容；先到「工作台」创建实体。',
+      'codex.title': '设定集',
+      'codex.total': '共 {n} 条',
+      'codex.groupsUnit': '类',
       'writing.outline': '大纲',
       'writing.notes': '笔记',
       'writing.emptyOutline': '大纲为空；点下方「新建节点」。',
@@ -3462,6 +3542,9 @@ window.__ModuleLoader__.load({
       'codex.exportedAt': 'Exported at {date}',
       'codex.tags': 'Tags',
       'codex.empty': 'Nothing to compile yet; create entities in the workbench first.',
+      'codex.title': 'Codex',
+      'codex.total': '{n} entries',
+      'codex.groupsUnit': 'types',
       'writing.outline': 'Outline',
       'writing.notes': 'Notes',
       'writing.emptyOutline': 'Outline is empty; click "New node" below.',
