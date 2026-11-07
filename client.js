@@ -809,18 +809,27 @@ window.__ModuleLoader__.load({
     // ─────────────────────────────────────────────
 
     /**
-     * 设计常量：间距 / 字号 / 圆角 / 尺寸 / 动效。
-     * 约束：canvas 内无法用 CSS var，颜色常量单独放 GraphView.TYPE_COLORS。
+     * 设计常量（对齐 WorldSea theme.css 令牌体系：精致极简 · 暖灰中性底 + 克制靛蓝强调）。
+     * 字号/圆角/动效曲线与 WorldSea 同值；颜色经 DS 色→dsh token 映射表落地（WS_COLORS）。
+     * canvas 内无法用 CSS var，GraphView.TYPE_COLORS 仍用具体色值。
      */
     const DS = {
       space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 },
-      font: { xs: 11, sm: 12, md: 13, lg: 15, xl: 17, title: 21 },
-      radius: { sm: 6, md: 10, lg: 14, pill: 999 },
-      navWidth: 148,
-      /** 交互过渡（统一时长与缓动，克制不花哨）。 */
-      transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease',
-      /** 交互态背景（hover/active 统一取 token 组合）。 */
+      font: { x2s: 10, xs: 11, sm: 12, md: 13, base: 14, lg: 16, xl: 20 },
+      radius: { xs: 4, sm: 6, mid: 8, md: 10, lg: 14, pill: 999 },
+      /** WorldSea 侧栏宽（--layout-sidebar-width 的插件内近似：三区双线布局）。 */
+      navWidth: 168,
+      /** WorldSea 动效：标准缓动曲线 + fast 0.15s（--transition-fast 同款）。 */
+      ease: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      durFast: '0.15s',
+      durBase: '0.22s',
+      /** 按压反馈统一缩放（--press-scale 同款）。 */
+      pressScale: 0.96,
+      transition: 'background 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+      /** 交互态背景（--hover-bg 语义 = bg-muted）。 */
       hoverBg: 'var(--dsw-alias-bg-layer-2)',
+      /** WorldSea active 语义 = accent-soft 弱底（非左侧条）；dsh 无 accent-soft token，用 brand 主色 12% 近似。 */
+      activeBg: 'color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent)',
       focusShadow: '0 0 0 2px var(--dsw-alias-brand-primary)',
     };
 
@@ -2408,7 +2417,7 @@ window.__ModuleLoader__.load({
         { id: 'maintain', label: t('nav.maintain'), items: ['health', 'portal'] },
       ];
       const NAV_GLYPHS = { workbench: 'grid', writing: 'note', manuscript: 'manuscript', graph: 'graph', timeline: 'clock', codex: 'book', health: 'shield', portal: 'globe' };
-      /** 导航行（图标 + 文字；窄模式只留图标，文字由 CSS 隐藏）。 */
+      /** 导航行（图标 + 文字；active = accent-soft 弱底 + accent 字，对齐 WorldSea .ws-sn-view.active）。 */
       const navRow = (id) => {
         const active = view === id;
         return h('div', {
@@ -2418,11 +2427,10 @@ window.__ModuleLoader__.load({
           style: {
             ...dsControlBase,
             display: 'flex', alignItems: 'center', gap: DS.space.sm,
-            padding: '7px 10px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.md,
-            background: active ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
-            color: active ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)',
-            fontWeight: active ? 600 : 400,
-            borderLeft: '3px solid ' + (active ? 'var(--dsw-alias-brand-primary)' : 'transparent'),
+            padding: '6px 8px', borderRadius: DS.radius.sm, cursor: 'pointer', fontSize: DS.font.sm,
+            background: active ? DS.activeBg : 'transparent',
+            color: active ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-primary)',
+            fontWeight: active ? 500 : 400,
           },
           onMouseOver: e => { if (!active) e.currentTarget.style.background = DS.hoverBg; },
           onMouseOut: e => { if (!active) e.currentTarget.style.background = 'transparent'; },
