@@ -1305,14 +1305,24 @@ window.__ModuleLoader__.load({
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 } },
           h('div', { style: { fontSize: DS.font.md + 1, fontWeight: 600 } }, t('relations.title')),
           h('div', { style: { flex: 1 } }),
-          h('select', { value: relType, onChange: e => setRelType(e.target.value), style: { ...inputStyle, width: 'auto' } },
-            allDefs.map(r => h('option', { key: r.type, value: r.type }, r.label + (r.isCustom ? ' ★' : '')))),
-          h('select', { value: direction, onChange: e => setDirection(e.target.value), style: { ...inputStyle, width: 'auto' } },
-            h('option', { value: 'out' }, t('relations.outgoing')),
-            h('option', { value: 'in' }, t('relations.incoming'))),
-          h('select', { value: targetId, onChange: e => setTargetId(e.target.value), style: { ...inputStyle, width: 'auto', maxWidth: 180 } },
-            h('option', { value: '' }, t('relations.pickTarget')),
-            candidates.map(e => h('option', { key: e.id, value: e.id }, e.title + '（' + e.type + '）'))),
+          h(Dropdown, {
+            value: relType,
+            options: allDefs.map(r => ({ value: r.type, label: r.label + (r.isCustom ? ' ★' : '') })),
+            onChange: v => setRelType(v),
+            width: 130,
+          }),
+          h(Dropdown, {
+            value: direction,
+            options: [{ value: 'out', label: t('relations.outgoing') }, { value: 'in', label: t('relations.incoming') }],
+            onChange: v => setDirection(v),
+            width: 130,
+          }),
+          h(Dropdown, {
+            value: targetId,
+            options: [{ value: '', label: t('relations.pickTarget') }, ...candidates.map(e => ({ value: e.id, label: e.title + '（' + e.type + '）' }))],
+            onChange: v => setTargetId(v),
+            width: 180,
+          }),
           h(PrimaryButton, {
             small: true,
             onClick: () => {
@@ -1751,19 +1761,18 @@ window.__ModuleLoader__.load({
                 style: { ...inputStyle, fontSize: DS.font.xl, fontWeight: 600, marginBottom: DS.space.sm },
               }),
               tab === 'outline' ? h('div', { style: { display: 'flex', gap: DS.space.sm, marginBottom: DS.space.sm, flexWrap: 'wrap' } },
-                h('select', {
+                h(Dropdown, {
                   value: selected.properties.parentId || '',
-                  onChange: e => actions.patchProperties(selected.id, 'parentId', e.target.value),
-                  style: { ...inputStyle, width: 'auto' },
-                },
-                  h('option', { value: '' }, t('writing.rootNode')),
-                  nodes.filter(n => n.id !== selected.id).map(n => h('option', { key: n.id, value: n.id }, n.title))),
-                h('select', {
+                  options: [{ value: '', label: t('writing.rootNode') }, ...nodes.filter(n => n.id !== selected.id).map(n => ({ value: n.id, label: n.title }))],
+                  onChange: v => actions.patchProperties(selected.id, 'parentId', v),
+                  width: 170,
+                }),
+                h(Dropdown, {
                   value: selected.properties.condition || '未写',
-                  onChange: e => actions.patchProperties(selected.id, 'condition', e.target.value),
-                  style: { ...inputStyle, width: 'auto' },
-                },
-                  ['未写', '草稿', '完成'].map(s => h('option', { key: s, value: s }, s))),
+                  options: ['未写', '草稿', '完成'].map(s => ({ value: s, label: s })),
+                  onChange: v => actions.patchProperties(selected.id, 'condition', v),
+                  width: 100,
+                }),
                 h('input', {
                   value: selected.properties.storylines || '',
                   placeholder: t('writing.storylines'),
@@ -1905,19 +1914,18 @@ window.__ModuleLoader__.load({
                 style: { ...inputStyle, fontSize: DS.font.xl, fontWeight: 600, marginBottom: DS.space.sm },
               }),
               h('div', { style: { display: 'flex', gap: DS.space.sm, marginBottom: DS.space.sm, flexWrap: 'wrap', alignItems: 'center' } },
-                h('select', {
+                h(Dropdown, {
                   value: selected.properties.condition || '草稿',
-                  onChange: e => actions.patchProperties(selected.id, 'condition', e.target.value),
-                  style: { ...inputStyle, width: 'auto' },
-                },
-                  ['草稿', '修订中', '终稿'].map(s => h('option', { key: s, value: s }, s))),
-                h('select', {
+                  options: ['草稿', '修订中', '终稿'].map(s => ({ value: s, label: s })),
+                  onChange: v => actions.patchProperties(selected.id, 'condition', v),
+                  width: 110,
+                }),
+                h(Dropdown, {
                   value: selected.properties.bookId || '',
-                  onChange: e => actions.patchProperties(selected.id, 'bookId', e.target.value),
-                  style: { ...inputStyle, width: 'auto' },
-                },
-                  h('option', { value: '' }, t('ms.orphaned')),
-                  books.map(b => h('option', { key: b.id, value: b.id }, b.title))),
+                  options: [{ value: '', label: t('ms.orphaned') }, ...books.map(b => ({ value: b.id, label: b.title }))],
+                  onChange: v => actions.patchProperties(selected.id, 'bookId', v),
+                  width: 160,
+                }),
                 h('input', {
                   value: selected.properties.volumeName || '',
                   placeholder: t('ms.volume'),
@@ -2313,13 +2321,12 @@ window.__ModuleLoader__.load({
         // 边筛选条。
         h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' } },
           h('span', { style: { fontSize: DS.font.sm, color: 'var(--ws-text-secondary)' } }, t('graph.filter')),
-          h('select', {
+          h(Dropdown, {
             value: edgeFilter,
-            onChange: e => setEdgeFilter(e.target.value),
-            style: { ...inputStyle, width: 'auto', padding: '3px 8px', fontSize: DS.font.sm },
-          },
-            h('option', { value: '' }, t('graph.allRelations')),
-            usedLabels.map(label => h('option', { key: label, value: label }, label))),
+            options: [{ value: '', label: t('graph.allRelations') }, ...usedLabels.map(label => ({ value: label, label }))],
+            onChange: v => setEdgeFilter(v),
+            width: 170,
+          }),
         ),
         h('canvas', {
           ref: canvasRef,
@@ -2441,6 +2448,63 @@ window.__ModuleLoader__.load({
     }
 
     /** schema 字段渲染：view 模式或 edit 模式。 */
+    /**
+     * 自绘下拉（对齐 WorldSea CustomDropdown：触发钮 + 绝对定位面板 + 点外关闭）。
+     * options: [{value, label}]；受控组件。
+     */
+    function Dropdown(props) {
+      const { value, options, onChange, placeholder, width } = props;
+      const [open, setOpen] = React.useState(false);
+      const rootRef = React.useRef(null);
+      const current = options.find(o => o.value === value);
+      React.useEffect(() => {
+        if (!open) return;
+        const onDoc = e => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false); };
+        const onKey = e => { if (e.key === 'Escape') setOpen(false); };
+        document.addEventListener('mousedown', onDoc);
+        document.addEventListener('keydown', onKey);
+        return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+      }, [open]);
+      return h('div', { ref: rootRef, style: { position: 'relative', width: width || 'auto' } },
+        h('button', {
+          onClick: () => setOpen(!open),
+          style: {
+            ...dsControlBase, width: '100%',
+            display: 'flex', alignItems: 'center', gap: DS.space.sm,
+            padding: '5px 10px', borderRadius: DS.radius.sm, cursor: 'pointer',
+            border: '1px solid var(--ws-border)', background: 'var(--ws-bg-muted)',
+            color: current ? 'var(--ws-text-primary)' : 'var(--ws-text-muted)', fontSize: DS.font.sm,
+          },
+        },
+          h('span', { style: { flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+            current ? current.label : (placeholder || '—')),
+          h('span', { style: { color: 'var(--ws-text-muted)', fontSize: DS.font.x2s } }, open ? '▲' : '▼'),
+        ),
+        open ? h('div', {
+          style: {
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 400,
+            minWidth: '100%', maxHeight: 280, overflowY: 'auto',
+            background: 'var(--ws-bg-surface)', border: '1px solid var(--ws-border-strong)',
+            borderRadius: DS.radius.md, boxShadow: 'var(--ws-shadow-md)', padding: DS.space.xs,
+          },
+        },
+          options.map(o => h('div', {
+            key: o.value,
+            onClick: () => { onChange(o.value); setOpen(false); },
+            style: {
+              ...dsControlBase, cursor: 'pointer',
+              padding: '6px 10px', borderRadius: DS.radius.sm, fontSize: DS.font.sm,
+              background: o.value === value ? DS.activeBg : 'transparent',
+              color: o.value === value ? 'var(--ws-accent)' : 'var(--ws-text-primary)',
+              whiteSpace: 'nowrap',
+            },
+            onMouseOver: e => { if (o.value !== value) e.currentTarget.style.background = DS.hoverBg; },
+            onMouseOut: e => { if (o.value !== value) e.currentTarget.style.background = 'transparent'; },
+          }, o.label)),
+        ) : null,
+      );
+    }
+
     /** 字段显示模式（对齐 WorldSea 字段式切换 chips：分组式/表格式/段落式/摘要式/时间轴式——插件实现段落式与键值式两档）。 */
     const DETAIL_VIEW_MODES = ['grouped', 'kv'];
 
@@ -2464,14 +2528,13 @@ window.__ModuleLoader__.load({
       }
       let control;
       if (field.fieldType === 'select') {
-        control = h('select', {
+        // 自绘下拉（对齐 CustomDropdown；原生 select 在暗色下白底违和）。
+        control = h(Dropdown, {
           value: value || '',
-          onChange: e => onChange(field.key, e.target.value),
-          style: inputStyle,
-        },
-          h('option', { value: '' }, '—'),
-          field.options.map(o => h('option', { key: o, value: o }, o)),
-        );
+          options: [{ value: '', label: '—' }, ...(field.options || []).map(o => ({ value: o, label: o }))],
+          onChange: v => onChange(field.key, v),
+          width: '100%',
+        });
       } else if (field.fieldType === 'textarea') {
         control = h('textarea', {
           value: value || '',
@@ -2790,8 +2853,12 @@ window.__ModuleLoader__.load({
           h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 } },
             h('input', { value: type, placeholder: t('customType.key'), onChange: e => setType(e.target.value), style: { ...inputStyle, width: 120 } }),
             h('input', { value: label, placeholder: t('customType.label'), onChange: e => setLabel(e.target.value), style: { ...inputStyle, width: 100 } }),
-            h('select', { value: domain, onChange: e => setDomain(e.target.value), style: { ...inputStyle, width: 110 } },
-              DOMAINS.map(d => h('option', { key: d.id, value: d.id }, d.label))),
+            h(Dropdown, {
+              value: domain,
+              options: DOMAINS.map(d => ({ value: d.id, label: d.label })),
+              onChange: v => setDomain(v),
+              width: 130,
+            }),
             h(PrimaryButton, {
               small: true,
               onClick: () => {
@@ -3064,14 +3131,13 @@ window.__ModuleLoader__.load({
                   '›',
                   h('span', { style: { color: 'var(--ws-text-primary)', fontWeight: 600 } }, typeDef.label),
                 ),
-                // 域下拉（收束在面包屑后，点开切换）——简化：点击面包屑轮转域，类型用下拉
-                h('select', {
+                // 域下拉（自绘，对齐 CustomDropdown）
+                h(Dropdown, {
                   value: activeType,
-                  onChange: e => actions.selectType(e.target.value),
-                  style: { ...inputStyle, width: 'auto', padding: '3px 8px', fontSize: DS.font.sm },
-                },
-                  allTypes.map(def => h('option', { key: def.type, value: def.type },
-                    (DOMAIN_LABEL.get(def.domain) || def.domain) + ' · ' + def.label + ' (' + entities.filter(e => e.type === def.type).length + ')'))),
+                  options: allTypes.map(def => ({ value: def.type, label: (DOMAIN_LABEL.get(def.domain) || def.domain) + ' · ' + def.label + ' (' + entities.filter(e => e.type === def.type).length + ')' })),
+                  onChange: v => actions.selectType(v),
+                  width: 200,
+                }),
                 h('input', {
                   value: search,
                   placeholder: t('workbench.searchPlaceholder'),
