@@ -558,6 +558,43 @@ window.__ModuleLoader__.load({
           draft.batchSelection = [];
         },
         /**
+         * 合并所选实体到第一个（主实体）：描述拼接、properties 并集（主实体优先）、
+         * 标签并集；副实体的关系边改挂主实体（同型同向同目标已存在则丢弃，幂等）。
+         */
+        batchMerge(draft) {
+          if (!draft.batchSelection || draft.batchSelection.length < 2) return;
+          const [mainId, ...subIds] = draft.batchSelection;
+          const main = draft.entities.find(e => e.id === mainId);
+          const subs = draft.entities.filter(e => subIds.includes(e.id));
+          if (!main || subs.length === 0) return;
+          for (const sub of subs) {
+            if (sub.description && sub.description !== main.description) {
+              main.description = main.description ? main.description + '\n\n— 合并自 ' + sub.title + ' —\n' + sub.description : sub.description;
+            }
+            for (const [key, value] of Object.entries(sub.properties || {})) {
+              if (main.properties[key] === undefined || main.properties[key] === '') main.properties[key] = value;
+            }
+            for (const tag of sub.tags) {
+              if (!main.tags.includes(tag)) main.tags.push(tag);
+            }
+            if (sub.updatedAt > main.updatedAt) main.updatedAt = sub.updatedAt;
+          }
+          // 关系改挂：副实体端点换主实体；换完同型同向同目标去重（含自环丢弃）。
+          for (const rel of draft.relations) {
+            if (rel.sourceId && subIds.includes(rel.sourceId)) rel.sourceId = mainId;
+            if (rel.targetId && subIds.includes(rel.targetId)) rel.targetId = mainId;
+          }
+          draft.relations = draft.relations.filter(r => {
+            if (r.sourceId === r.targetId) return false;
+            return !draft.relations.some(x => x.id !== r.id
+              && x.type === r.type && x.sourceId === r.sourceId && x.targetId === r.targetId);
+          });
+          draft.entities = draft.entities.filter(e => !subIds.includes(e.id));
+          draft.selectedId = mainId;
+          draft.batchSelection = [];
+          draft.batchMode = false;
+        },
+        /**
          * 建关系：有向边 source→target；非对称关系自动补逆边（pairId 互指）。
          * 对称关系（inverseType === type）只建一条边。支持内置与自定义类型。
          */
@@ -1720,6 +1757,12 @@ window.__ModuleLoader__.load({
                   h(GhostButton, {
                     small: true,
                     onClick: () => {
+                      if (batchSelection.length >= 2 && window.confirm(t('batch.mergeConfirm').replace('{n}', String(batchSelection.length)))) actions.batchMerge();
+                    },
+                  }, t('batch.merge')),
+                  h(GhostButton, {
+                    small: true,
+                    onClick: () => {
                       if (batchSelection.length && window.confirm(t('batch.deleteConfirm').replace('{n}', String(batchSelection.length)))) actions.batchRemove();
                     },
                   }, t('batch.delete')),
@@ -1842,6 +1885,8 @@ window.__ModuleLoader__.load({
       'batch.applyTag': '加标签',
       'batch.delete': '删除所选',
       'batch.deleteConfirm': '确定删除所选 {n} 个实体及其全部关系？',
+      'batch.merge': '合并到首个',
+      'batch.mergeConfirm': '把后 {n0} 个实体合并进第一个（保留第一个）？字段取并集、关系改挂，操作不可撤销。',
       'data.title': '数据管理',
       'data.export': '导出 JSON',
       'data.import': '导入 JSON',
@@ -1923,6 +1968,8 @@ window.__ModuleLoader__.load({
       'batch.applyTag': 'Add tag',
       'batch.delete': 'Delete',
       'batch.deleteConfirm': 'Delete {n} selected entities and all their relations?',
+      'batch.merge': 'Merge into first',
+      'batch.mergeConfirm': 'Merge the other {n0} entities into the first (keep the first)? Fields union, relations re-attached; irreversible.',
       'data.title': 'Data',
       'data.export': 'Export JSON',
       'data.import': 'Import JSON',
